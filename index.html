@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Générateur de messages brise-glace</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    body { font-family: Arial, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; }
     h1 { margin-bottom: 6px; }
     p { margin-top: 0; color: #444; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -14,11 +14,10 @@
       width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ccc; box-sizing: border-box;
       font-size: 14px;
     }
-    textarea { min-height: 120px; resize: vertical; }
+    textarea { min-height: 140px; resize: vertical; }
     .card { background: #fafafa; border: 1px solid #eee; border-radius: 16px; padding: 14px; }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .row > * { flex: 1; }
-    .actions { display: flex; gap: 10px; margin-top: 10px; }
+    .actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
     button { cursor: pointer; border: none; background: #1f7a5b; color: #fff; font-weight: 700; }
     button.secondary { background: #444; }
     button.ghost { background: #eaeaea; color: #222; border: 1px solid #ddd; }
@@ -26,11 +25,14 @@
     .full { grid-column: 1 / -1; }
     .hint { background: #fff6d8; border: 1px solid #ffe19a; padding: 10px; border-radius: 12px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#e9f5ef; border:1px solid #cfe8dd; font-size:12px; color:#185a43; }
   </style>
 </head>
 <body>
   <h1>Générateur de messages brise-glace</h1>
-  <p>Tu remplis, tu cliques, et tu récupères un message prêt à envoyer (sans te prendre la tête).</p>
+  <p>
+    Niveau 2 : <span class="pill">Relances J+7 / J+14</span> + messages plus naturels.
+  </p>
 
   <div class="grid">
     <div class="card">
@@ -55,8 +57,8 @@
           <label for="relation">Niveau de relation</label>
           <select id="relation">
             <option value="froid">Froid (on se connaît pas)</option>
-            <option value="tiède">Tiède (on s’est déjà vus/parlés)</option>
-            <option value="chaud">Chaud (bonne vibe / proche)</option>
+            <option value="tiède">Tiède (déjà parlé)</option>
+            <option value="chaud">Chaud (bonne vibe)</option>
           </select>
         </div>
 
@@ -66,13 +68,21 @@
             <option value="discussion">Ouvrir la discussion</option>
             <option value="question">Poser une question simple</option>
             <option value="invitation">Inviter à un appel / café virtuel</option>
+            <option value="relance7">Relance J+7</option>
+            <option value="relance14">Relance J+14</option>
           </select>
         </div>
 
         <div class="full">
+          <label for="dernier">Dernier contact (optionnel)</label>
+          <input id="dernier" type="date" />
+          <div class="small">Si tu mets une date, je te calcule le nombre de jours depuis le dernier contact.</div>
+        </div>
+
+        <div class="full">
           <label for="accroche">Accroche / contexte (optionnel)</label>
-          <input id="accroche" placeholder="Ex: j’ai vu ta story / ton post sur le sport / ton voyage..." />
-          <div class="small">Astuce : plus tu mets un détail réel, plus le message paraît naturel.</div>
+          <input id="accroche" placeholder="Ex: ta story / ton post sur le sport / ton voyage..." />
+          <div class="small">Astuce : un détail réel = message naturel.</div>
         </div>
 
         <div class="full">
@@ -81,12 +91,14 @@
         </div>
 
         <div class="full hint">
-          <strong>Micro-règle :</strong> On évite le mode “vente”. On vise d’abord <em>humain + curiosité</em>. Le business vient ensuite 😉
+          <strong>Règle d’or :</strong> d’abord humain + curiosité. L’invitation doit sentir le “échange”, pas le “pitch”.
         </div>
 
         <div class="full actions">
           <button id="btnGen">Générer</button>
           <button class="ghost" id="btnRandom">🎲 Variante</button>
+          <button class="ghost" id="btnRel7">Relance J+7</button>
+          <button class="ghost" id="btnRel14">Relance J+14</button>
           <button class="secondary" id="btnClear">Effacer</button>
         </div>
       </div>
@@ -98,7 +110,7 @@
       <div class="actions">
         <button class="ghost" id="btnCopy">Copier</button>
       </div>
-      <div class="small">Tu peux générer plusieurs fois et garder la meilleure version.</div>
+      <div class="small" id="daysInfo"></div>
       <hr style="border:none;border-top:1px solid #eee;margin:12px 0;">
       <div class="small mono" id="debug"></div>
     </div>
@@ -107,44 +119,48 @@
   <script>
     const $ = (id) => document.getElementById(id);
 
-    function pick(arr) {
-      return arr[Math.floor(Math.random() * arr.length)];
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function clean(s) { return (s || "").trim(); }
+
+    function daysSince(dateStr) {
+      if (!dateStr) return null;
+      const d = new Date(dateStr + "T00:00:00");
+      const now = new Date();
+      const ms = now - d;
+      if (isNaN(ms)) return null;
+      return Math.floor(ms / (1000 * 60 * 60 * 24));
     }
 
-    function clean(s) {
-      return (s || "").trim();
-    }
-
-    function buildMessage({ prenom, plateforme, relation, objectif, accroche, centre }) {
+    function buildMessage({ prenom, plateforme, relation, objectif, accroche, centre, days }) {
       const hello = [
         `Salut ${prenom} !`,
         `Hello ${prenom} 👋`,
         `Coucou ${prenom} !`
       ];
 
-      const introFroid = [
-        `Je tombe sur ton profil via ${plateforme} et je voulais te dire que j’aime bien ton univers.`,
-        `Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`,
-        `Je te découvre sur ${plateforme} et je me dis “ok, vibe intéressante”.`
-      ];
-
-      const introTiede = [
-        `Ça fait un moment ! Je suis retombé sur ton profil et je me suis dit que je passais te dire bonjour.`,
-        `Je repensais à notre échange, et je me suis dit que ça valait le coup de reprendre contact.`,
-        `Petit message rapide, parce que j’ai pensé à toi en voyant passer un truc sur ${plateforme}.`
-      ];
-
-      const introChaud = [
-        `Hey ${prenom}, j’espère que tu vas bien 😊`,
-        `Yo ${prenom} ! Petite pensée du jour 😄`,
-        `Hello toi ! Tu me diras comment tu vas 👀`
-      ];
+      const introByRel = {
+        froid: [
+          `Je te découvre sur ${plateforme} et je voulais te dire que j’aime bien ton univers.`,
+          `Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`,
+          `Je tombe sur ton profil via ${plateforme} : vibe intéressante.`
+        ],
+        "tiède": [
+          `Ça fait un moment ! Je suis retombé sur ton profil et je me suis dit que je passais te dire bonjour.`,
+          `Je repensais à notre échange, et je me suis dit que ça valait le coup de reprendre contact.`,
+          `Petit message rapide : je me suis dit “allez, je reprends des nouvelles”.`
+        ],
+        chaud: [
+          `Hey ${prenom}, j’espère que tu vas bien 😊`,
+          `Yo ${prenom} ! Petite pensée du jour 😄`,
+          `Hello toi ! Tu me diras comment tu vas 👀`
+        ]
+      };
 
       const hook = accroche
         ? [
             `J’ai vu ${accroche} — ça m’a fait sourire.`,
-            `J’ai vu ${accroche} et je me suis dit “ok, stylé”.`,
-            `Ton ${accroche} m’a intrigué.`
+            `Ton ${accroche} m’a intrigué.`,
+            `J’ai vu ${accroche} et je me suis dit “ok, stylé”.`
           ]
         : [
             `Au fait, quoi de neuf en ce moment ?`,
@@ -156,7 +172,7 @@
         ? [
             `Au passage, tu es toujours à fond sur ${centre} ?`,
             `Ça avance tes trucs autour de ${centre} ?`,
-            `Et niveau ${centre}, tu kiffes toujours autant ?`
+            `Et niveau ${centre}, ça dit quoi ?`
           ]
         : [
             `Tu es sur quoi en ce moment ?`,
@@ -165,15 +181,15 @@
           ];
 
       const goalDiscussion = [
-        `En tout cas, plaisir de te croiser ici 🙂`,
+        `Je ne voulais pas passer sans te saluer 🙂`,
         `Bref, je voulais juste te dire bonjour !`,
-        `Je ne voulais pas passer sans te saluer.`
+        `En tout cas, plaisir de te croiser ici.`
       ];
 
       const goalQuestion = [
-        `Petite question : tu préfères plutôt ${plateforme} ou une autre plateforme pour échanger ?`,
-        `Je suis curieux : c’est quoi ton focus du moment ?`,
-        `Question rapide : tu es plutôt team projets perso, boulot, ou les deux ?`
+        `Question rapide : c’est quoi ton focus du moment ?`,
+        `Petite question : tu préfères échanger ici ou ailleurs ?`,
+        `Je suis curieux : tu es plutôt team projets perso, boulot… ou les deux ?`
       ];
 
       const goalInvite = [
@@ -182,48 +198,89 @@
         `Ça te chauffe un petit café virtuel cette semaine ? 10 minutes, et basta 😄`
       ];
 
+      const relance7 = [
+        `Je me permets une petite relance 🙂 Je voulais juste être sûr que tu avais vu mon message.`,
+        `Petit follow-up (promis, pas insistant 😄) : tu avais eu le temps de voir mon message ?`,
+        `Je te relance vite fait, au cas où mon message se serait perdu dans la jungle de ${plateforme} 🥷`
+      ];
+
+      const relance14 = [
+        `Je reviens vers toi une dernière fois 🙂 Si c’est pas le bon moment, aucun souci.`,
+        `Je ne veux pas spam, donc je fais une dernière relance : si tu veux qu’on en parle, je suis dispo.`,
+        `Dernier petit ping et après je te laisse tranquille 😄 C’était surtout pour prendre des nouvelles.`
+      ];
+
       const outro = [
         `Bonne journée à toi ✨`,
         `À bientôt 🙂`,
         `Force à toi 💪`
       ];
 
-      const intro = relation === "froid" ? pick(introFroid)
-                  : relation === "tiède" ? pick(introTiede)
-                  : pick(introChaud);
-
+      const intro = pick(introByRel[relation] || introByRel.froid);
       const middle = pick(hook) + " " + pick(interest);
+
+      // Petite touche “contextuelle” : si on a une date
+      const daysLine = (typeof days === "number")
+        ? (days <= 3 ? `Au passage, je sais qu’on s’est parlé il n’y a pas si longtemps.` :
+           days <= 10 ? `Ça fait déjà quelques jours, je me suis dit que je repassais.` :
+           `Ça fait un petit moment, je me disais que ça valait le coup de reprendre contact.`)
+        : null;
 
       let goalLine = "";
       if (objectif === "discussion") goalLine = pick(goalDiscussion);
       if (objectif === "question") goalLine = pick(goalQuestion);
       if (objectif === "invitation") goalLine = pick(goalInvite);
+      if (objectif === "relance7") goalLine = pick(relance7);
+      if (objectif === "relance14") goalLine = pick(relance14);
 
-      return `${pick(hello)}\n\n${intro}\n${middle}\n\n${goalLine}\n\n${pick(outro)}`;
+      const parts = [
+        pick(hello),
+        "",
+        intro,
+        middle,
+        daysLine ? daysLine : null,
+        "",
+        goalLine,
+        "",
+        pick(outro)
+      ].filter(Boolean);
+
+      return parts.join("\n");
     }
 
-    function generate() {
+    function generate(forcedObjective=null) {
       const prenom = clean($("prenom").value) || "toi";
       const plateforme = $("plateforme").value;
       const relation = $("relation").value;
-      const objectif = $("objectif").value;
+      const objectif = forcedObjective || $("objectif").value;
       const accroche = clean($("accroche").value);
       const centre = clean($("centre").value);
+      const days = daysSince($("dernier").value);
 
-      const msg = buildMessage({ prenom, plateforme, relation, objectif, accroche, centre });
+      const msg = buildMessage({ prenom, plateforme, relation, objectif, accroche, centre, days });
       $("result").value = msg;
 
       $("debug").textContent =
         `paramètres => prenom:${prenom} | plateforme:${plateforme} | relation:${relation} | objectif:${objectif}`;
+
+      $("daysInfo").textContent =
+        (typeof days === "number")
+          ? `Dernier contact : il y a ${days} jour(s).`
+          : `Astuce : ajoute une date pour contextualiser la relance.`;
     }
 
-    $("btnGen").addEventListener("click", generate);
-    $("btnRandom").addEventListener("click", generate);
+    $("btnGen").addEventListener("click", () => generate());
+    $("btnRandom").addEventListener("click", () => generate());
+    $("btnRel7").addEventListener("click", () => generate("relance7"));
+    $("btnRel14").addEventListener("click", () => generate("relance14"));
 
     $("btnClear").addEventListener("click", () => {
-      ["prenom","accroche","centre"].forEach(id => $(id).value = "");
+      ["prenom","accroche","centre","dernier"].forEach(id => $(id).value = "");
+      $("objectif").value = "discussion";
       $("result").value = "";
       $("debug").textContent = "";
+      $("daysInfo").textContent = "";
+      generate();
     });
 
     $("btnCopy").addEventListener("click", async () => {
@@ -233,12 +290,11 @@
         await navigator.clipboard.writeText(text);
         $("btnCopy").textContent = "Copié ✅";
         setTimeout(() => $("btnCopy").textContent = "Copier", 900);
-      } catch (e) {
-        alert("Copie impossible (navigateur). Sélectionne le texte et fais Ctrl+C.");
+      } catch {
+        alert("Copie impossible. Sélectionne le texte et fais Ctrl+C.");
       }
     });
 
-    // Génère un exemple au chargement
     generate();
   </script>
 </body>
