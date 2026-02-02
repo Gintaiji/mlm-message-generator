@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Générateur de messages brise-glace</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    body { font-family: Arial, sans-serif; max-width: 1040px; margin: 24px auto; padding: 0 16px; }
     h1 { margin-bottom: 6px; }
     p { margin-top: 0; color: #444; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -14,9 +14,8 @@
       width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ccc; box-sizing: border-box;
       font-size: 14px;
     }
-    textarea { min-height: 140px; resize: vertical; }
+    textarea { min-height: 160px; resize: vertical; }
     .card { background: #fafafa; border: 1px solid #eee; border-radius: 16px; padding: 14px; }
-    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
     button { cursor: pointer; border: none; background: #1f7a5b; color: #fff; font-weight: 700; }
     button.secondary { background: #444; }
@@ -31,7 +30,7 @@
 <body>
   <h1>Générateur de messages brise-glace</h1>
   <p>
-    Niveau 2 : <span class="pill">Relances J+7 / J+14</span> + messages plus naturels.
+    Niveau 2 : <span class="pill">Anti-robot</span> (style + longueur) pour des messages plus naturels.
   </p>
 
   <div class="grid">
@@ -73,10 +72,28 @@
           </select>
         </div>
 
+        <div>
+          <label for="styleTone">Style</label>
+          <select id="styleTone">
+            <option value="neutre">Neutre</option>
+            <option value="pro">Pro</option>
+            <option value="fun">Fun</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="lengthMode">Longueur</label>
+          <select id="lengthMode">
+            <option value="court">Court</option>
+            <option value="normal" selected>Normal</option>
+            <option value="long">Long</option>
+          </select>
+        </div>
+
         <div class="full">
           <label for="dernier">Dernier contact (optionnel)</label>
           <input id="dernier" type="date" />
-          <div class="small">Si tu mets une date, je te calcule le nombre de jours depuis le dernier contact.</div>
+          <div class="small">Si tu mets une date, je contextualise automatiquement.</div>
         </div>
 
         <div class="full">
@@ -91,7 +108,7 @@
         </div>
 
         <div class="full hint">
-          <strong>Règle d’or :</strong> d’abord humain + curiosité. L’invitation doit sentir le “échange”, pas le “pitch”.
+          <strong>Anti-robot :</strong> structure qui varie + phrases alternatives + longueur modulable.
         </div>
 
         <div class="full actions">
@@ -118,9 +135,8 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-
-    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-    function clean(s) { return (s || "").trim(); }
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const clean = (s) => (s || "").trim();
 
     function daysSince(dateStr) {
       if (!dateStr) return null;
@@ -131,31 +147,118 @@
       return Math.floor(ms / (1000 * 60 * 60 * 24));
     }
 
-    function buildMessage({ prenom, plateforme, relation, objectif, accroche, centre, days }) {
-      const hello = [
-        `Salut ${prenom} !`,
-        `Hello ${prenom} 👋`,
-        `Coucou ${prenom} !`
-      ];
+    function tonePacks(style, plateforme, prenom) {
+      // Petits “packs” selon style. On garde ça simple mais efficace.
+      const packs = {
+        pro: {
+          hello: [
+            `Bonjour ${prenom},`,
+            `Bonjour ${prenom} 👋`,
+            `Hello ${prenom},`
+          ],
+          outro: [
+            `Bonne journée,`,
+            `Au plaisir d’échanger,`,
+            `Bien à vous,`
+          ],
+          emojis: false,
+          funWords: []
+        },
+        neutre: {
+          hello: [
+            `Salut ${prenom} !`,
+            `Hello ${prenom} 👋`,
+            `Coucou ${prenom} !`
+          ],
+          outro: [
+            `Bonne journée à toi ✨`,
+            `À bientôt 🙂`,
+            `Force à toi 💪`
+          ],
+          emojis: true,
+          funWords: []
+        },
+        fun: {
+          hello: [
+            `Yo ${prenom} 😄`,
+            `Hey ${prenom} 👋`,
+            `Coucou ${prenom} 😄`
+          ],
+          outro: [
+            `Belle journée à toi ✨`,
+            `À très vite 😄`,
+            `Force & good vibes 💪`
+          ],
+          emojis: true,
+          funWords: [
+            `la jungle de ${plateforme}`,
+            `le vortex des notifications`,
+            `l’algorithme farceur`
+          ]
+        }
+      };
+      return packs[style] || packs.neutre;
+    }
 
+    function buildMessage({ prenom, plateforme, relation, objectif, accroche, centre, days, style, lengthMode }) {
+      const pack = tonePacks(style, plateforme, prenom);
+
+      // Intros par relation
       const introByRel = {
-        froid: [
-          `Je te découvre sur ${plateforme} et je voulais te dire que j’aime bien ton univers.`,
-          `Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`,
-          `Je tombe sur ton profil via ${plateforme} : vibe intéressante.`
-        ],
-        "tiède": [
-          `Ça fait un moment ! Je suis retombé sur ton profil et je me suis dit que je passais te dire bonjour.`,
-          `Je repensais à notre échange, et je me suis dit que ça valait le coup de reprendre contact.`,
-          `Petit message rapide : je me suis dit “allez, je reprends des nouvelles”.`
-        ],
-        chaud: [
-          `Hey ${prenom}, j’espère que tu vas bien 😊`,
-          `Yo ${prenom} ! Petite pensée du jour 😄`,
-          `Hello toi ! Tu me diras comment tu vas 👀`
-        ]
+        froid: {
+          pro: [
+            `Je me permets de vous écrire après être tombé sur votre profil sur ${plateforme}.`,
+            `Je découvre votre profil sur ${plateforme} et je souhaitais vous saluer.`,
+            `Je viens de voir votre contenu sur ${plateforme} et je me permets un message.`
+          ],
+          neutre: [
+            `Je te découvre sur ${plateforme} et je voulais te dire que j’aime bien ton univers.`,
+            `Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`,
+            `Je tombe sur ton profil via ${plateforme} : vibe intéressante.`
+          ],
+          fun: [
+            `Je te découvre sur ${plateforme} et… ok, j’avoue : ça m’a donné envie de te parler 😄`,
+            `Je viens de tomber sur ton profil sur ${plateforme} : l’algorithme a bien bossé.`,
+            `Je passe par ${plateforme} et je me dis : “tiens… ça sent la bonne vibe ici.”`
+          ]
+        },
+        "tiède": {
+          pro: [
+            `Je reviens vers vous, je me disais que cela valait le coup de reprendre contact.`,
+            `Petit message pour reprendre des nouvelles depuis notre dernier échange.`,
+            `Je me permets de revenir vers vous suite à notre précédent échange.`
+          ],
+          neutre: [
+            `Ça fait un moment ! Je suis retombé sur ton profil et je me suis dit que je passais te dire bonjour.`,
+            `Je repensais à notre échange, et je me suis dit que ça valait le coup de reprendre contact.`,
+            `Petit message rapide : je me suis dit “allez, je reprends des nouvelles”.`
+          ],
+          fun: [
+            `Hey, ça fait un petit moment ! Je reviens dans ta DM-zone 😄`,
+            `Je repasse te dire bonjour, parce que voilà : j’aime bien les bonnes vibes.`,
+            `Je me suis dit : “allez, je reprends des nouvelles avant que l’algorithme nous sépare.”`
+          ]
+        },
+        chaud: {
+          pro: [
+            `J’espère que vous allez bien. Je me permets de prendre des nouvelles.`,
+            `J’espère que tout va bien de votre côté. Petit message rapide.`,
+            `Bonjour, je passais simplement prendre des nouvelles.`
+          ],
+          neutre: [
+            `Hey ${prenom}, j’espère que tu vas bien 😊`,
+            `Yo ${prenom} ! Petite pensée du jour 😄`,
+            `Hello toi ! Tu me diras comment tu vas 👀`
+          ],
+          fun: [
+            `Yo ${prenom} ! Comment va la légende ? 😄`,
+            `Hey toi ! Petit check-up vibe du jour 👀`,
+            `Coucou ! Je passe prendre des nouvelles, version ninja 🥷`
+          ]
+        }
       };
 
+      // Hooks & interests
       const hook = accroche
         ? [
             `J’ai vu ${accroche} — ça m’a fait sourire.`,
@@ -180,72 +283,178 @@
             `Qu’est-ce qui t’occupe en ce moment ?`
           ];
 
-      const goalDiscussion = [
-        `Je ne voulais pas passer sans te saluer 🙂`,
-        `Bref, je voulais juste te dire bonjour !`,
-        `En tout cas, plaisir de te croiser ici.`
-      ];
+      // Objectifs
+      const goal = {
+        discussion: {
+          pro: [
+            `Je voulais simplement vous saluer.`,
+            `Je ne voulais pas passer sans vous dire bonjour.`,
+            `Je vous souhaite une excellente journée.`
+          ],
+          neutre: [
+            `Je ne voulais pas passer sans te saluer 🙂`,
+            `Bref, je voulais juste te dire bonjour !`,
+            `En tout cas, plaisir de te croiser ici.`
+          ],
+          fun: [
+            `Bref : je passais dire bonjour, simple et efficace 😄`,
+            `Juste un petit coucou, pas de piège, pas de pitch 😇`,
+            `Je passe prendre des nouvelles, et je repars sur la pointe des pieds 🥷`
+          ]
+        },
+        question: {
+          pro: [
+            `Petite question : quel est votre focus du moment ?`,
+            `Question rapide : vous préférez échanger ici ou ailleurs ?`,
+            `Je suis curieux : sur quoi êtes-vous concentré en ce moment ?`
+          ],
+          neutre: [
+            `Question rapide : c’est quoi ton focus du moment ?`,
+            `Petite question : tu préfères échanger ici ou ailleurs ?`,
+            `Je suis curieux : tu es plutôt team projets perso, boulot… ou les deux ?`
+          ],
+          fun: [
+            `Question flash ⚡ : ton focus du moment, c’est quoi ?`,
+            `Tu es plutôt team “projets” ou team “mode chill” en ce moment ? 😄`,
+            `Dis-moi : qu’est-ce qui te booste en ce moment ?`
+          ]
+        },
+        invitation: {
+          pro: [
+            `Si vous êtes disponible, on peut se caler 10 minutes cette semaine pour échanger.`,
+            `Si cela vous convient, je vous propose un court échange (10 minutes) cette semaine.`,
+            `Souhaitez-vous qu’on se planifie un bref appel pour faire connaissance ?`
+          ],
+          neutre: [
+            `Si ça te dit, on se cale 10 minutes cette semaine, juste pour papoter et prendre des nouvelles.`,
+            `Si tu veux, on se fait un mini appel (10 min) tranquille, sans prise de tête.`,
+            `Ça te chauffe un petit café virtuel cette semaine ? 10 minutes, et basta 😄`
+          ],
+          fun: [
+            `On se cale 10 minutes cette semaine ? Version “papotage propre” 😄`,
+            `Café virtuel express ? 10 minutes et on repart chacun sauver le monde ☕`,
+            `Si tu veux, on se fait un mini call : 10 minutes, pas plus, parole de scout 🫡`
+          ]
+        },
+        relance7: {
+          pro: [
+            `Je me permets une relance, au cas où mon message vous aurait échappé.`,
+            `Petit suivi : avez-vous eu le temps de voir mon message ?`,
+            `Je reviens vers vous rapidement, au cas où cela se soit perdu.`
+          ],
+          neutre: [
+            `Je me permets une petite relance 🙂 Je voulais juste être sûr que tu avais vu mon message.`,
+            `Petit follow-up : tu avais eu le temps de voir mon message ?`,
+            `Je te relance vite fait, au cas où mon message se serait perdu.`
+          ],
+          fun: [
+            `Je relance en douceur 😄 Mon message s’est peut-être perdu dans ${pick(pack.funWords.length? pack.funWords : [`${plateforme}`])}.`,
+            `Petit ping 🛎️ : t’avais vu mon message ou l’algorithme a fait le ninja ?`,
+            `Mini relance, promis je ne spam pas 😇`
+          ]
+        },
+        relance14: {
+          pro: [
+            `Je reviens une dernière fois : si ce n’est pas le bon moment, aucun souci.`,
+            `Dernier message de suivi : je vous laisse revenir vers moi si besoin.`,
+            `Je ne souhaite pas insister : je vous laisse vers moi si vous le souhaitez.`
+          ],
+          neutre: [
+            `Je reviens vers toi une dernière fois 🙂 Si c’est pas le bon moment, aucun souci.`,
+            `Je ne veux pas spam, donc je fais une dernière relance : si tu veux qu’on en parle, je suis dispo.`,
+            `Dernier petit ping et après je te laisse tranquille 😄`
+          ],
+          fun: [
+            `Dernier petit ping et après je disparais dans la fumée 🥷💨`,
+            `Je fais ma dernière relance et après je te laisse respirer 😄`,
+            `Promis : dernière relance. Ensuite, je redeviens un personnage secondaire 😄`
+          ]
+        }
+      };
 
-      const goalQuestion = [
-        `Question rapide : c’est quoi ton focus du moment ?`,
-        `Petite question : tu préfères échanger ici ou ailleurs ?`,
-        `Je suis curieux : tu es plutôt team projets perso, boulot… ou les deux ?`
-      ];
+      const styleKey = (style === "pro" ? "pro" : style === "fun" ? "fun" : "neutre");
 
-      const goalInvite = [
-        `Si ça te dit, on se cale 10 minutes cette semaine, juste pour papoter et prendre des nouvelles.`,
-        `Si tu veux, on se fait un mini appel (10 min) tranquille, sans prise de tête.`,
-        `Ça te chauffe un petit café virtuel cette semaine ? 10 minutes, et basta 😄`
-      ];
+      const intro = pick(introByRel[relation]?.[styleKey] || introByRel.froid.neutre);
 
-      const relance7 = [
-        `Je me permets une petite relance 🙂 Je voulais juste être sûr que tu avais vu mon message.`,
-        `Petit follow-up (promis, pas insistant 😄) : tu avais eu le temps de voir mon message ?`,
-        `Je te relance vite fait, au cas où mon message se serait perdu dans la jungle de ${plateforme} 🥷`
-      ];
-
-      const relance14 = [
-        `Je reviens vers toi une dernière fois 🙂 Si c’est pas le bon moment, aucun souci.`,
-        `Je ne veux pas spam, donc je fais une dernière relance : si tu veux qu’on en parle, je suis dispo.`,
-        `Dernier petit ping et après je te laisse tranquille 😄 C’était surtout pour prendre des nouvelles.`
-      ];
-
-      const outro = [
-        `Bonne journée à toi ✨`,
-        `À bientôt 🙂`,
-        `Force à toi 💪`
-      ];
-
-      const intro = pick(introByRel[relation] || introByRel.froid);
-      const middle = pick(hook) + " " + pick(interest);
-
-      // Petite touche “contextuelle” : si on a une date
       const daysLine = (typeof days === "number")
-        ? (days <= 3 ? `Au passage, je sais qu’on s’est parlé il n’y a pas si longtemps.` :
-           days <= 10 ? `Ça fait déjà quelques jours, je me suis dit que je repassais.` :
-           `Ça fait un petit moment, je me disais que ça valait le coup de reprendre contact.`)
+        ? (days <= 3 ? (styleKey==="pro" ? `Nous avons échangé récemment, je me permets un petit message.` : `Je sais qu’on s’est parlé récemment, je repasse vite fait.`)
+           : days <= 10 ? (styleKey==="pro" ? `Je me permets de revenir vers vous après quelques jours.` : `Ça fait déjà quelques jours, je me suis dit que je repassais.`)
+           : (styleKey==="pro" ? `Cela fait un moment, je me permets de reprendre contact.` : `Ça fait un petit moment, je me disais que ça valait le coup de reprendre contact.`))
         : null;
 
-      let goalLine = "";
-      if (objectif === "discussion") goalLine = pick(goalDiscussion);
-      if (objectif === "question") goalLine = pick(goalQuestion);
-      if (objectif === "invitation") goalLine = pick(goalInvite);
-      if (objectif === "relance7") goalLine = pick(relance7);
-      if (objectif === "relance14") goalLine = pick(relance14);
+      const goalLine = pick(goal[objectif]?.[styleKey] || goal.discussion.neutre);
 
-      const parts = [
-        pick(hello),
-        "",
-        intro,
-        middle,
-        daysLine ? daysLine : null,
-        "",
-        goalLine,
-        "",
-        pick(outro)
-      ].filter(Boolean);
+      const outro = pick(pack.outro);
 
-      return parts.join("\n");
+      // Longueur : on module le nombre de “blocs”
+      // court => intro + goal
+      // normal => intro + hook+interest + goal
+      // long => intro + hook+interest + daysLine + mini-phrase + goal
+      const hookLine = pick(hook);
+      const interestLine = pick(interest);
+
+      const fillerLong = {
+        pro: [
+          `Je préfère un échange simple et direct.`,
+          `Rien d’urgent, c’est surtout pour garder le contact.`,
+          `Je reste flexible selon vos disponibilités.`
+        ],
+        neutre: [
+          `Je suis en mode “prendre des nouvelles”, tout simplement.`,
+          `Rien d’urgent, c’est juste pour garder le lien.`,
+          `Et si c’est pas le bon moment, aucun souci.`
+        ],
+        fun: [
+          `Je viens en paix 😄`,
+          `Promis, pas de “script robot” ici 🤖❌`,
+          `Je passe juste pour la vibe.`
+        ]
+      };
+
+      const lines = [];
+      // Salutation
+      lines.push(pick(pack.hello));
+      lines.push("");
+
+      if (lengthMode === "court") {
+        lines.push(intro);
+        lines.push("");
+        lines.push(goalLine);
+        lines.push("");
+        lines.push(outro);
+        return lines.join("\n");
+      }
+
+      if (lengthMode === "normal") {
+        lines.push(intro);
+        // Variation de structure : parfois hook puis interest, parfois l’inverse
+        if (Math.random() < 0.5) {
+          lines.push(hookLine);
+          lines.push(interestLine);
+        } else {
+          lines.push(interestLine);
+          lines.push(hookLine);
+        }
+        lines.push("");
+        lines.push(goalLine);
+        lines.push("");
+        lines.push(outro);
+        return lines.join("\n");
+      }
+
+      // long
+      lines.push(intro);
+      // Variation de structure
+      const order = Math.random() < 0.5 ? [hookLine, interestLine] : [interestLine, hookLine];
+      lines.push(order[0]);
+      lines.push(order[1]);
+      if (daysLine) lines.push(daysLine);
+      lines.push(pick(fillerLong[styleKey]));
+      lines.push("");
+      lines.push(goalLine);
+      lines.push("");
+      lines.push(outro);
+      return lines.join("\n");
     }
 
     function generate(forcedObjective=null) {
@@ -253,20 +462,22 @@
       const plateforme = $("plateforme").value;
       const relation = $("relation").value;
       const objectif = forcedObjective || $("objectif").value;
+      const style = $("styleTone").value;
+      const lengthMode = $("lengthMode").value;
       const accroche = clean($("accroche").value);
       const centre = clean($("centre").value);
       const days = daysSince($("dernier").value);
 
-      const msg = buildMessage({ prenom, plateforme, relation, objectif, accroche, centre, days });
+      const msg = buildMessage({ prenom, plateforme, relation, objectif, accroche, centre, days, style, lengthMode });
       $("result").value = msg;
 
       $("debug").textContent =
-        `paramètres => prenom:${prenom} | plateforme:${plateforme} | relation:${relation} | objectif:${objectif}`;
+        `paramètres => prenom:${prenom} | plateforme:${plateforme} | relation:${relation} | objectif:${objectif} | style:${style} | longueur:${lengthMode}`;
 
       $("daysInfo").textContent =
         (typeof days === "number")
           ? `Dernier contact : il y a ${days} jour(s).`
-          : `Astuce : ajoute une date pour contextualiser la relance.`;
+          : `Astuce : ajoute une date pour contextualiser.`;
     }
 
     $("btnGen").addEventListener("click", () => generate());
@@ -277,6 +488,8 @@
     $("btnClear").addEventListener("click", () => {
       ["prenom","accroche","centre","dernier"].forEach(id => $(id).value = "");
       $("objectif").value = "discussion";
+      $("styleTone").value = "neutre";
+      $("lengthMode").value = "normal";
       $("result").value = "";
       $("debug").textContent = "";
       $("daysInfo").textContent = "";
