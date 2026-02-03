@@ -3,44 +3,49 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Générateur de messages brise-glace</title>
+  <title>Générateur + mini CRM (CSV)</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 24px auto; padding: 0 16px; }
-    h1 { margin-bottom: 6px; }
-    p { margin-top: 0; color: #444; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    label { display: block; font-weight: 600; margin-bottom: 6px; }
+    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+    h1 { margin: 0 0 6px; }
+    p { margin: 0 0 14px; color: #444; }
+    .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; }
+    .card { background:#fafafa; border:1px solid #eee; border-radius:16px; padding:14px; }
+    label { display:block; font-weight:700; margin: 10px 0 6px; }
     input, select, textarea, button {
-      width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ccc; box-sizing: border-box;
-      font-size: 14px;
+      width:100%; padding:10px; border-radius:10px; border:1px solid #ccc; box-sizing:border-box; font-size:14px;
     }
-    textarea { min-height: 180px; resize: vertical; }
-    .card { background: #fafafa; border: 1px solid #eee; border-radius: 16px; padding: 14px; }
-    .actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-    button { cursor: pointer; border: none; background: #1f7a5b; color: #fff; font-weight: 700; }
-    button.secondary { background: #444; }
-    button.ghost { background: #eaeaea; color: #222; border: 1px solid #ddd; }
-    .small { font-size: 12px; color: #666; }
-    .full { grid-column: 1 / -1; }
-    .hint { background: #fff6d8; border: 1px solid #ffe19a; padding: 10px; border-radius: 12px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    textarea { min-height:140px; resize: vertical; }
+    button { cursor:pointer; border:none; background:#1f7a5b; color:#fff; font-weight:800; }
+    button.secondary { background:#444; }
+    button.ghost { background:#eaeaea; color:#222; border:1px solid #ddd; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    .small { font-size:12px; color:#666; }
+    .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .row3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
     .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#e9f5ef; border:1px solid #cfe8dd; font-size:12px; color:#185a43; }
+    table { width:100%; border-collapse: collapse; margin-top:10px; background:#fff; border-radius:12px; overflow:hidden; }
+    th, td { border-bottom:1px solid #eee; padding:8px; font-size:13px; text-align:left; vertical-align:top; }
+    th { background:#f3f3f3; }
+    tr:hover { background:#fbfbfb; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .inline > * { flex: 1; min-width: 180px; }
   </style>
 </head>
 <body>
-  <h1>Générateur de messages brise-glace</h1>
+  <h1>Générateur de messages + mini CRM</h1>
   <p>
-    Niveau 3 : <span class="pill">Profil + Intention</span> + invitation élégante (zéro pitch).
+    <span class="pill">Export / Import CSV</span> • gratuit • fonctionne partout
   </p>
 
   <div class="grid">
+    <!-- LEFT: FORM + OUTPUT -->
     <div class="card">
-      <div class="grid">
+      <div class="row3">
         <div>
           <label for="prenom">Prénom</label>
           <input id="prenom" placeholder="Ex: Julie" />
         </div>
-
         <div>
           <label for="plateforme">Plateforme</label>
           <select id="plateforme">
@@ -51,22 +56,23 @@
             <option>WhatsApp</option>
           </select>
         </div>
-
         <div>
-          <label for="relation">Niveau de relation</label>
+          <label for="relation">Relation</label>
           <select id="relation">
-            <option value="froid">Froid (on se connaît pas)</option>
-            <option value="tiède">Tiède (déjà parlé)</option>
-            <option value="chaud">Chaud (bonne vibe)</option>
+            <option value="froid">Froid</option>
+            <option value="tiède">Tiède</option>
+            <option value="chaud">Chaud</option>
           </select>
         </div>
+      </div>
 
+      <div class="row3">
         <div>
           <label for="objectif">Objectif</label>
           <select id="objectif">
-            <option value="discussion">Ouvrir la discussion</option>
-            <option value="question">Poser une question simple</option>
-            <option value="invitation">Inviter à un appel / café virtuel</option>
+            <option value="discussion">Discussion</option>
+            <option value="question">Question</option>
+            <option value="invitation">Invitation</option>
             <option value="relance7">Relance J+7</option>
             <option value="relance14">Relance J+14</option>
           </select>
@@ -89,7 +95,9 @@
             <option value="long">Long</option>
           </select>
         </div>
+      </div>
 
+      <div class="row2">
         <div>
           <label for="persona">Type de personne</label>
           <select id="persona">
@@ -100,7 +108,7 @@
             <option value="etudiant">Étudiant / début de carrière</option>
             <option value="createur">Créateur / contenu</option>
             <option value="job">Salarié / carrière</option>
-            <option value="indefini" selected>Indéfini (général)</option>
+            <option value="indefini" selected>Indéfini</option>
           </select>
         </div>
 
@@ -113,47 +121,80 @@
             <option value="curiosite">Curiosité / apprendre</option>
           </select>
         </div>
+      </div>
 
-        <div class="full">
-          <label for="dernier">Dernier contact (optionnel)</label>
+      <div class="row2">
+        <div>
+          <label for="dernier">Dernier contact</label>
           <input id="dernier" type="date" />
-          <div class="small">Si tu mets une date, je contextualise automatiquement.</div>
         </div>
-
-        <div class="full">
-          <label for="accroche">Accroche / contexte (optionnel)</label>
-          <input id="accroche" placeholder="Ex: ta story / ton post sur le sport / ton voyage..." />
-          <div class="small">Astuce : un détail réel = message naturel.</div>
-        </div>
-
-        <div class="full">
-          <label for="centre">Centres d’intérêt (optionnel)</label>
-          <input id="centre" placeholder="Ex: sport, famille, voyage, entrepreneuriat..." />
-        </div>
-
-        <div class="full hint">
-          <strong>Pro tip :</strong> L’intention “Opportunité (soft)” ne vend rien : elle ouvre une porte polie.
-        </div>
-
-        <div class="full actions">
-          <button id="btnGen">Générer</button>
-          <button class="ghost" id="btnRandom">🎲 Variante</button>
-          <button class="ghost" id="btnRel7">Relance J+7</button>
-          <button class="ghost" id="btnRel14">Relance J+14</button>
-          <button class="secondary" id="btnClear">Effacer</button>
+        <div>
+          <label for="centre">Centres d’intérêt</label>
+          <input id="centre" placeholder="Ex: sport, voyage, famille..." />
         </div>
       </div>
-    </div>
 
-    <div class="card">
+      <label for="accroche">Accroche / contexte</label>
+      <input id="accroche" placeholder="Ex: ta story / ton post / ton voyage..." />
+
+      <label for="note">Note (CRM)</label>
+      <input id="note" placeholder="Ex: rencontré via story, aime voyager, à relancer mardi..." />
+
+      <div class="actions">
+        <button id="btnGen">Générer</button>
+        <button class="ghost" id="btnRandom">🎲 Variante</button>
+        <button class="ghost" id="btnCopy">Copier</button>
+        <button class="secondary" id="btnClear">Effacer</button>
+      </div>
+
+      <div class="small" id="daysInfo"></div>
+
       <label for="result">Message généré</label>
       <textarea id="result" readonly></textarea>
-      <div class="actions">
-        <button class="ghost" id="btnCopy">Copier</button>
+
+      <div class="small mono" id="debug" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- RIGHT: CONTACTS + CSV -->
+    <div class="card">
+      <div class="inline">
+        <div>
+          <label for="contactSelect">Contacts</label>
+          <select id="contactSelect"></select>
+          <div class="small">Sélectionne → ça remplit le formulaire.</div>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="ghost" id="btnAdd">+ Ajouter/Mettre à jour</button>
+        </div>
       </div>
-      <div class="small" id="daysInfo"></div>
-      <hr style="border:none;border-top:1px solid #eee;margin:12px 0;">
-      <div class="small mono" id="debug"></div>
+
+      <div class="actions">
+        <button class="ghost" id="btnExport">Exporter CSV</button>
+        <button class="ghost" id="btnImportBtn">Importer CSV</button>
+        <input id="importFile" type="file" accept=".csv,text/csv" style="display:none;" />
+        <button class="secondary" id="btnDelete">Supprimer contact</button>
+      </div>
+
+      <div class="small">
+        Colonnes CSV : <span class="mono">prenom,plateforme,relation,objectif,style,longueur,persona,intention,dernier,centre,accroche,note</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Prénom</th>
+            <th>Plateforme</th>
+            <th>Dernier</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="contactTableBody"></tbody>
+      </table>
+
+      <div class="small" style="margin-top:10px;">
+        Astuce : l’outil sauvegarde en local sur ce navigateur (gratuit). Le CSV sert à transférer/backup vers Google Sheets.
+      </div>
     </div>
   </div>
 
@@ -161,6 +202,8 @@
     const $ = (id) => document.getElementById(id);
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     const clean = (s) => (s || "").trim();
+
+    const STORAGE_KEY = "mlm_contacts_v1";
 
     function daysSince(dateStr) {
       if (!dateStr) return null;
@@ -171,6 +214,7 @@
       return Math.floor(ms / (1000 * 60 * 60 * 24));
     }
 
+    // ------------------ MESSAGE GEN ------------------
     function tonePacks(style, plateforme, prenom) {
       const packs = {
         pro: {
@@ -190,105 +234,45 @@
       return packs[style] || packs.neutre;
     }
 
-    function personaLines(persona, styleKey, centre) {
-      const c = centre ? ` (${centre})` : "";
+    function personaLine(persona, styleKey) {
       const map = {
-        entrepreneur: {
-          pro: [`J’aime bien échanger avec des personnes orientées projets et résultats.`],
-          neutre: [`J’aime bien connecter avec des gens qui construisent des projets.`],
-          fun: [`J’aime les gens qui build des trucs, ça me motive 😄`]
-        },
-        parent: {
-          pro: [`Je trouve toujours intéressant d’échanger avec des personnes qui jonglent avec la vie de famille.`],
-          neutre: [`Respect à ceux qui gèrent la famille et mille choses en même temps.`],
-          fun: [`Team “multi-tâches ultime”, respect 😄`]
-        },
-        sportif: {
-          pro: [`Je m’intéresse beaucoup à la discipline et aux habitudes qui font progresser.`],
-          neutre: [`J’aime bien les vibes sport / santé, ça donne une énergie différente.`],
-          fun: [`Team progression + sueur + bonne humeur 😄`]
-        },
-        voyage: {
-          pro: [`J’apprécie les profils curieux et ouverts, surtout autour du voyage.`],
-          neutre: [`Les profils voyage/lifestyle, ça donne envie de bouger.`],
-          fun: [`Attention, ton contenu donne envie de prendre un billet 😄`]
-        },
-        etudiant: {
-          pro: [`J’aime bien échanger avec des personnes en phase de construction (études/début de carrière).`],
-          neutre: [`J’aime bien connecter avec des gens qui démarrent et se construisent.`],
-          fun: [`La période “je construis mon futur”, grosse énergie 😄`]
-        },
-        createur: {
-          pro: [`Je respecte beaucoup la constance et la créativité dans le contenu.`],
-          neutre: [`J’aime bien les créateurs : on sent la patte et la régularité.`],
-          fun: [`Créateur = respect. C’est un sport de haut niveau 😄`]
-        },
-        job: {
-          pro: [`Je trouve intéressant d’échanger sur les objectifs et l’évolution professionnelle.`],
-          neutre: [`J’aime bien parler objectifs, organisation, évolution.`],
-          fun: [`Team “on progresse sans se cramer”, j’aime bien 😄`]
-        },
-        indefini: {
-          pro: [`Je suis toujours partant pour un échange simple et humain.`],
-          neutre: [`J’aime bien les échanges simples, humains.`],
-          fun: [`Je passe pour la vibe, simple 😄`]
-        }
+        entrepreneur: { pro:`J’aime bien échanger avec des personnes orientées projets.`, neutre:`J’aime bien connecter avec des gens qui construisent des projets.`, fun:`J’aime les gens qui build des trucs 😄` },
+        parent:       { pro:`Toujours intéressant d’échanger avec des personnes qui jonglent avec la vie de famille.`, neutre:`Respect à ceux qui gèrent la famille et mille choses.`, fun:`Team multitâches ultime, respect 😄` },
+        sportif:      { pro:`La discipline et les habitudes qui font progresser m’intéressent.`, neutre:`Les vibes sport/santé, j’aime bien.`, fun:`Team progression + bonne humeur 😄` },
+        voyage:       { pro:`Les profils curieux et ouverts, surtout voyage, j’aime bien.`, neutre:`Les profils voyage/lifestyle, ça donne envie de bouger.`, fun:`Ton contenu donne envie de prendre un billet 😄` },
+        etudiant:     { pro:`J’aime bien échanger avec des personnes en phase de construction.`, neutre:`J’aime bien connecter avec des gens qui démarrent.`, fun:`Grosse énergie “je construis mon futur” 😄` },
+        createur:     { pro:`Je respecte beaucoup la constance et la créativité.`, neutre:`On sent la patte chez les créateurs.`, fun:`Créateur = sport de haut niveau 😄` },
+        job:          { pro:`Échanger sur objectifs et évolution pro, je trouve ça intéressant.`, neutre:`J’aime bien parler objectifs et organisation.`, fun:`Team “on progresse sans se cramer” 😄` },
+        indefini:     { pro:`Je suis partant pour un échange simple et humain.`, neutre:`J’aime bien les échanges simples, humains.`, fun:`Je passe pour la vibe, simple 😄` }
       };
-      const block = map[persona] || map.indefini;
-      return pick(block[styleKey] || block.neutre);
+      const b = map[persona] || map.indefini;
+      return b[styleKey] || b.neutre;
     }
 
-    function buildMessage(params) {
+    function buildMessage(p) {
       const {
-        prenom, plateforme, relation, objectif, accroche, centre, days,
-        style, lengthMode, persona, intention
-      } = params;
+        prenom, plateforme, relation, objectif, style, lengthMode,
+        persona, intention, accroche, centre, days
+      } = p;
 
       const pack = tonePacks(style, plateforme, prenom);
       const styleKey = (style === "pro" ? "pro" : style === "fun" ? "fun" : "neutre");
 
       const introByRel = {
         froid: {
-          pro: [
-            `Je me permets de vous écrire après être tombé sur votre profil sur ${plateforme}.`,
-            `Je découvre votre profil sur ${plateforme} et je souhaitais vous saluer.`
-          ],
-          neutre: [
-            `Je te découvre sur ${plateforme} et je voulais te dire que j’aime bien ton univers.`,
-            `Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`
-          ],
-          fun: [
-            `Je viens de tomber sur ton profil sur ${plateforme} : l’algorithme a bien bossé 😄`,
-            `Je passe par ${plateforme} et je me dis : “ok… vibe intéressante ici.”`
-          ]
+          pro: [`Je me permets de vous écrire après être tombé sur votre profil sur ${plateforme}.`, `Je découvre votre profil sur ${plateforme} et je souhaitais vous saluer.`],
+          neutre: [`Je te découvre sur ${plateforme} et j’aime bien ton univers.`, `Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`],
+          fun: [`Je viens de tomber sur ton profil sur ${plateforme} : l’algorithme a bien bossé 😄`, `Je passe par ${plateforme} et je me dis : “ok… vibe intéressante ici.”`]
         },
         "tiède": {
-          pro: [
-            `Je reviens vers vous, je me disais que cela valait le coup de reprendre contact.`,
-            `Petit message pour reprendre des nouvelles depuis notre dernier échange.`
-          ],
-          neutre: [
-            `Ça fait un moment ! Je repasse te dire bonjour.`,
-            `Je repensais à notre échange, et je me suis dit que ça valait le coup de reprendre contact.`
-          ],
-          fun: [
-            `Hey, je reviens dans ta DM-zone 😄`,
-            `Je repasse prendre des nouvelles avant que l’algorithme nous sépare 😄`
-          ]
+          pro: [`Je reviens vers vous, je me disais que cela valait le coup de reprendre contact.`, `Petit message pour reprendre des nouvelles.`],
+          neutre: [`Je repasse te dire bonjour 🙂`, `Je me suis dit que ça valait le coup de reprendre contact.`],
+          fun: [`Je reviens dans ta DM-zone 😄`, `Je repasse avant que l’algorithme nous sépare 😄`]
         },
         chaud: {
-          pro: [
-            `J’espère que vous allez bien. Je me permets de prendre des nouvelles.`,
-            `Bonjour, je passais simplement prendre des nouvelles.`
-          ],
-          neutre: [
-            `Hey ${prenom}, j’espère que tu vas bien 😊`,
-            `Yo ${prenom} ! Petite pensée du jour 😄`
-          ],
-          fun: [
-            `Yo ${prenom} ! Comment va la légende ? 😄`,
-            `Petit check-up vibe du jour 👀`
-          ]
+          pro: [`J’espère que vous allez bien. Je me permets de prendre des nouvelles.`, `Bonjour, je passais simplement prendre des nouvelles.`],
+          neutre: [`Hey ${prenom}, j’espère que tu vas bien 😊`, `Yo ${prenom} ! Petite pensée du jour 😄`],
+          fun: [`Yo ${prenom} ! Comment va la légende ? 😄`, `Petit check-up vibe du jour 👀`]
         }
       };
 
@@ -305,18 +289,6 @@
            : days <= 10 ? (styleKey==="pro" ? `Je me permets de revenir vers vous après quelques jours.` : `Ça fait quelques jours, je me suis dit que je repassais.`)
            : (styleKey==="pro" ? `Cela fait un moment, je me permets de reprendre contact.` : `Ça fait un petit moment, je me disais que ça valait le coup.`))
         : null;
-
-      const relance7 = {
-        pro: [`Je me permets une relance, au cas où mon message vous aurait échappé.`],
-        neutre: [`Petite relance 🙂 Tu avais eu le temps de voir mon message ?`],
-        fun: [`Petit ping 🛎️ : l’algorithme a fait le ninja ou tu avais vu ? 😄`]
-      };
-
-      const relance14 = {
-        pro: [`Je reviens une dernière fois : si ce n’est pas le bon moment, aucun souci.`],
-        neutre: [`Dernière relance 🙂 Si ce n’est pas le moment, aucun souci.`],
-        fun: [`Dernier petit ping et après je disparais dans la fumée 🥷💨`]
-      };
 
       const invitationSoft = {
         reseau: {
@@ -341,7 +313,7 @@
         collab: {
           pro: [`Je pensais à une possible collaboration/échange d’idées. Si cela vous intéresse, on peut en parler.`],
           neutre: [`Je me disais qu’on pourrait échanger sur un projet / une collab possible.`],
-          fun: [`Je sens qu’il y a une vibe “collab” possible 😄 On en parle ?`]
+          fun: [`Je sens une vibe “collab” possible 😄 On en parle ?`]
         },
         curiosite: {
           pro: [`Je suis curieux d’en savoir plus sur ce que vous faites en ce moment.`],
@@ -350,129 +322,328 @@
         }
       };
 
-      const goals = {
-        discussion: {
-          pro: [`Je voulais simplement vous saluer.`],
-          neutre: [`Je ne voulais pas passer sans te saluer 🙂`],
-          fun: [`Je passais dire bonjour, simple et efficace 😄`]
-        },
-        question: {
-          pro: [`Petite question : quel est votre focus du moment ?`],
-          neutre: [`Question rapide : ton focus du moment, c’est quoi ?`],
-          fun: [`Question flash ⚡ : ton focus du moment, c’est quoi ?`]
-        },
+      const goal = {
+        discussion: { pro:[`Je voulais simplement vous saluer.`], neutre:[`Je ne voulais pas passer sans te saluer 🙂`], fun:[`Je passais dire bonjour, simple et efficace 😄`] },
+        question:   { pro:[`Petite question : quel est votre focus du moment ?`], neutre:[`Question rapide : ton focus du moment, c’est quoi ?`], fun:[`Question flash ⚡ : ton focus du moment, c’est quoi ?`] },
         invitation: invitationSoft[intention][styleKey],
-        relance7: relance7[styleKey],
-        relance14: relance14[styleKey]
+        relance7:   { pro:[`Je me permets une relance, au cas où mon message vous aurait échappé.`], neutre:[`Petite relance 🙂 Tu avais eu le temps de voir mon message ?`], fun:[`Petit ping 🛎️ : l’algorithme a fait le ninja ou tu avais vu ? 😄`] }[styleKey],
+        relance14:  { pro:[`Je reviens une dernière fois : si ce n’est pas le bon moment, aucun souci.`], neutre:[`Dernière relance 🙂 Si ce n’est pas le moment, aucun souci.`], fun:[`Dernier petit ping et après je disparais dans la fumée 🥷💨`] }[styleKey]
       };
 
       const intro = pick(introByRel[relation]?.[styleKey] || introByRel.froid.neutre);
-      const personaLine = personaLines(persona, styleKey, centre);
+      const personaTxt = personaLine(persona, styleKey);
+      const goalLine = pick(goal[objectif] || goal.discussion.neutre);
+      const outro = pick(pack.outro);
 
-      // Longueur : court / normal / long
       const lines = [];
       lines.push(pick(pack.hello));
       lines.push("");
 
       if (lengthMode === "court") {
         lines.push(intro);
-        lines.push(personaLine);
+        lines.push(personaTxt);
         lines.push("");
-        lines.push(pick(goals[objectif]));
+        lines.push(goalLine);
         lines.push("");
-        lines.push(pick(pack.outro));
+        lines.push(outro);
         return lines.join("\n");
       }
 
       if (lengthMode === "normal") {
         lines.push(intro);
-        // Variation
-        if (Math.random() < 0.5) {
-          lines.push(pick(hook));
-          lines.push(pick(interest));
-        } else {
-          lines.push(pick(interest));
-          lines.push(pick(hook));
-        }
-        lines.push(personaLine);
+        if (Math.random() < 0.5) { lines.push(pick(hook)); lines.push(pick(interest)); }
+        else { lines.push(pick(interest)); lines.push(pick(hook)); }
+        lines.push(personaTxt);
         if (daysLine) lines.push(daysLine);
         lines.push("");
-        lines.push(pick(goals[objectif]));
+        lines.push(goalLine);
         lines.push("");
-        lines.push(pick(pack.outro));
+        lines.push(outro);
         return lines.join("\n");
       }
 
       // long
-      lines.push(intro);
-      lines.push(pick(hook));
-      lines.push(pick(interest));
-      lines.push(personaLine);
-      if (daysLine) lines.push(daysLine);
-
-      // Mini phrase “human”
       const human = {
         pro: [`Rien d’urgent, c’est surtout pour garder un contact simple.`],
         neutre: [`Rien d’urgent, c’est juste pour garder le lien.`],
         fun: [`Promis, pas de script robot ici 🤖❌`]
       };
+
+      lines.push(intro);
+      lines.push(pick(hook));
+      lines.push(pick(interest));
+      lines.push(personaTxt);
+      if (daysLine) lines.push(daysLine);
       lines.push(pick(human[styleKey]));
       lines.push("");
-      lines.push(pick(goals[objectif]));
+      lines.push(goalLine);
       lines.push("");
-      lines.push(pick(pack.outro));
+      lines.push(outro);
       return lines.join("\n");
     }
 
-    function generate(forcedObjective=null) {
+    function generate() {
       const prenom = clean($("prenom").value) || "toi";
       const plateforme = $("plateforme").value;
       const relation = $("relation").value;
-      const objectif = forcedObjective || $("objectif").value;
-
+      const objectif = $("objectif").value;
       const style = $("styleTone").value;
       const lengthMode = $("lengthMode").value;
       const persona = $("persona").value;
       const intention = $("intention").value;
-
       const accroche = clean($("accroche").value);
       const centre = clean($("centre").value);
       const days = daysSince($("dernier").value);
 
-      const msg = buildMessage({
-        prenom, plateforme, relation, objectif,
-        accroche, centre, days, style, lengthMode,
-        persona, intention
-      });
-
+      const msg = buildMessage({ prenom, plateforme, relation, objectif, style, lengthMode, persona, intention, accroche, centre, days });
       $("result").value = msg;
 
       $("debug").textContent =
         `params => prenom:${prenom} | plateforme:${plateforme} | relation:${relation} | objectif:${objectif} | style:${style} | longueur:${lengthMode} | persona:${persona} | intention:${intention}`;
 
       $("daysInfo").textContent =
-        (typeof days === "number")
-          ? `Dernier contact : il y a ${days} jour(s).`
-          : `Astuce : ajoute une date pour contextualiser.`;
+        (typeof days === "number") ? `Dernier contact : il y a ${days} jour(s).` : `Astuce : ajoute une date pour contextualiser.`;
     }
 
-    $("btnGen").addEventListener("click", () => generate());
-    $("btnRandom").addEventListener("click", () => generate());
-    $("btnRel7").addEventListener("click", () => generate("relance7"));
-    $("btnRel14").addEventListener("click", () => generate("relance14"));
+    // ------------------ CONTACTS (LOCAL) ------------------
+    function loadContacts() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
 
-    $("btnClear").addEventListener("click", () => {
-      ["prenom","accroche","centre","dernier"].forEach(id => $(id).value = "");
-      $("objectif").value = "discussion";
-      $("styleTone").value = "neutre";
-      $("lengthMode").value = "normal";
-      $("persona").value = "indefini";
-      $("intention").value = "reseau";
-      $("result").value = "";
-      $("debug").textContent = "";
-      $("daysInfo").textContent = "";
+    function saveContacts(list) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
+
+    function contactKey(c) {
+      // clé simple : prénom + plateforme (tu peux améliorer après)
+      return `${(c.prenom||"").toLowerCase()}__${(c.plateforme||"").toLowerCase()}`;
+    }
+
+    function getFormAsContact() {
+      return {
+        prenom: clean($("prenom").value),
+        plateforme: $("plateforme").value,
+        relation: $("relation").value,
+        objectif: $("objectif").value,
+        style: $("styleTone").value,
+        longueur: $("lengthMode").value,
+        persona: $("persona").value,
+        intention: $("intention").value,
+        dernier: $("dernier").value || "",
+        centre: clean($("centre").value),
+        accroche: clean($("accroche").value),
+        note: clean($("note").value)
+      };
+    }
+
+    function fillFormFromContact(c) {
+      $("prenom").value = c.prenom || "";
+      $("plateforme").value = c.plateforme || "Instagram";
+      $("relation").value = c.relation || "froid";
+      $("objectif").value = c.objectif || "discussion";
+      $("styleTone").value = c.style || "neutre";
+      $("lengthMode").value = c.longueur || "normal";
+      $("persona").value = c.persona || "indefini";
+      $("intention").value = c.intention || "reseau";
+      $("dernier").value = c.dernier || "";
+      $("centre").value = c.centre || "";
+      $("accroche").value = c.accroche || "";
+      $("note").value = c.note || "";
       generate();
-    });
+    }
+
+    function refreshUI() {
+      const contacts = loadContacts();
+      const sel = $("contactSelect");
+      sel.innerHTML = "";
+
+      const opt0 = document.createElement("option");
+      opt0.value = "";
+      opt0.textContent = "— sélectionner —";
+      sel.appendChild(opt0);
+
+      contacts
+        .slice()
+        .sort((a,b) => (a.prenom||"").localeCompare(b.prenom||""))
+        .forEach((c, idx) => {
+          const o = document.createElement("option");
+          o.value = String(idx);
+          o.textContent = `${c.prenom || "(sans prénom)"} • ${c.plateforme || ""}`;
+          sel.appendChild(o);
+        });
+
+      const tbody = $("contactTableBody");
+      tbody.innerHTML = "";
+      contacts.forEach((c, idx) => {
+        const tr = document.createElement("tr");
+        tr.style.cursor = "pointer";
+        tr.title = "Clique pour charger ce contact";
+        tr.addEventListener("click", () => {
+          $("contactSelect").value = String(idx);
+          fillFormFromContact(c);
+        });
+
+        const td1 = document.createElement("td"); td1.textContent = c.prenom || "";
+        const td2 = document.createElement("td"); td2.textContent = c.plateforme || "";
+        const td3 = document.createElement("td"); td3.textContent = c.dernier || "";
+        const td4 = document.createElement("td"); td4.textContent = c.note || "";
+        tr.append(td1, td2, td3, td4);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addOrUpdateContact() {
+      const c = getFormAsContact();
+      if (!c.prenom) {
+        alert("Ajoute au moins un prénom pour enregistrer le contact 🙂");
+        return;
+      }
+      const contacts = loadContacts();
+      const key = contactKey(c);
+      const i = contacts.findIndex(x => contactKey(x) === key);
+      if (i >= 0) contacts[i] = c;
+      else contacts.push(c);
+      saveContacts(contacts);
+      refreshUI();
+    }
+
+    function deleteSelectedContact() {
+      const idx = $("contactSelect").value;
+      if (idx === "") return;
+      const contacts = loadContacts();
+      const i = Number(idx);
+      if (Number.isNaN(i) || i < 0 || i >= contacts.length) return;
+      const name = contacts[i]?.prenom || "ce contact";
+      if (!confirm(`Supprimer ${name} ?`)) return;
+      contacts.splice(i, 1);
+      saveContacts(contacts);
+      refreshUI();
+    }
+
+    // ------------------ CSV ------------------
+    const CSV_HEADERS = ["prenom","plateforme","relation","objectif","style","longueur","persona","intention","dernier","centre","accroche","note"];
+
+    function escapeCSV(value) {
+      const s = String(value ?? "");
+      if (/[",\n\r;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    }
+
+    function toCSVRow(obj) {
+      return CSV_HEADERS.map(h => escapeCSV(obj[h] ?? "")).join(",");
+    }
+
+    function exportCSV() {
+      const contacts = loadContacts();
+      const lines = [];
+      lines.push(CSV_HEADERS.join(","));
+      contacts.forEach(c => lines.push(toCSVRow(c)));
+      const csv = lines.join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "contacts_mlm.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function parseCSV(text) {
+      // parser simple (gère guillemets/doubles guillemets). Suffisant pour un CSV “propre”.
+      const rows = [];
+      let i = 0, field = "", row = [], inQuotes = false;
+
+      while (i < text.length) {
+        const ch = text[i];
+
+        if (inQuotes) {
+          if (ch === '"') {
+            const next = text[i+1];
+            if (next === '"') { field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += ch; i++; continue;
+        } else {
+          if (ch === '"') { inQuotes = true; i++; continue; }
+          if (ch === ',') { row.push(field); field = ""; i++; continue; }
+          if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+          if (ch === '\r') { i++; continue; }
+          field += ch; i++; continue;
+        }
+      }
+      row.push(field);
+      rows.push(row);
+      return rows;
+    }
+
+    function importCSVFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || "");
+        const rows = parseCSV(text);
+        if (rows.length < 1) { alert("CSV vide."); return; }
+
+        const headers = rows[0].map(h => h.trim());
+        const headerMap = {};
+        headers.forEach((h, idx) => headerMap[h] = idx);
+
+        // Vérif minimale : il faut au moins "prenom"
+        if (headerMap["prenom"] == null) {
+          alert("CSV invalide : colonne 'prenom' introuvable.");
+          return;
+        }
+
+        const imported = [];
+        for (let r = 1; r < rows.length; r++) {
+          const line = rows[r];
+          if (line.length === 1 && !line[0]) continue;
+
+          const obj = {};
+          CSV_HEADERS.forEach(h => {
+            const idx = headerMap[h];
+            obj[h] = (idx != null && idx < line.length) ? (line[idx] || "") : "";
+          });
+
+          // valeurs par défaut (si manquantes)
+          if (!obj.plateforme) obj.plateforme = "Instagram";
+          if (!obj.relation) obj.relation = "froid";
+          if (!obj.objectif) obj.objectif = "discussion";
+          if (!obj.style) obj.style = "neutre";
+          if (!obj.longueur) obj.longueur = "normal";
+          if (!obj.persona) obj.persona = "indefini";
+          if (!obj.intention) obj.intention = "reseau";
+
+          if (clean(obj.prenom)) imported.push(obj);
+        }
+
+        // Merge : même clé => update
+        const contacts = loadContacts();
+        imported.forEach(c => {
+          const key = contactKey(c);
+          const i = contacts.findIndex(x => contactKey(x) === key);
+          if (i >= 0) contacts[i] = c;
+          else contacts.push(c);
+        });
+
+        saveContacts(contacts);
+        refreshUI();
+        alert(`Import terminé ✅ (${imported.length} contact(s) importé(s))`);
+      };
+      reader.readAsText(file, "utf-8");
+    }
+
+    // ------------------ EVENTS ------------------
+    $("btnGen").addEventListener("click", generate);
+    $("btnRandom").addEventListener("click", generate);
 
     $("btnCopy").addEventListener("click", async () => {
       const text = $("result").value;
@@ -486,6 +657,45 @@
       }
     });
 
+    $("btnClear").addEventListener("click", () => {
+      ["prenom","centre","accroche","note","dernier"].forEach(id => $(id).value = "");
+      $("plateforme").value = "Instagram";
+      $("relation").value = "froid";
+      $("objectif").value = "discussion";
+      $("styleTone").value = "neutre";
+      $("lengthMode").value = "normal";
+      $("persona").value = "indefini";
+      $("intention").value = "reseau";
+      $("result").value = "";
+      $("debug").textContent = "";
+      $("daysInfo").textContent = "";
+      generate();
+    });
+
+    $("btnAdd").addEventListener("click", addOrUpdateContact);
+    $("btnDelete").addEventListener("click", deleteSelectedContact);
+
+    $("contactSelect").addEventListener("change", () => {
+      const idx = $("contactSelect").value;
+      if (idx === "") return;
+      const contacts = loadContacts();
+      const i = Number(idx);
+      if (Number.isNaN(i) || i < 0 || i >= contacts.length) return;
+      fillFormFromContact(contacts[i]);
+    });
+
+    $("btnExport").addEventListener("click", exportCSV);
+
+    $("btnImportBtn").addEventListener("click", () => $("importFile").click());
+    $("importFile").addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      importCSVFile(file);
+      e.target.value = "";
+    });
+
+    // init
+    refreshUI();
     generate();
   </script>
 </body>
