@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Générateur + mini CRM (CSV)</title>
+  <title>Générateur + mini CRM (CSV+statuts)</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+    body { font-family: Arial, sans-serif; max-width: 1250px; margin: 24px auto; padding: 0 16px; }
     h1 { margin: 0 0 6px; }
     p { margin: 0 0 14px; color: #444; }
-    .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; }
+    .grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 12px; }
     .card { background:#fafafa; border:1px solid #eee; border-radius:16px; padding:14px; }
     label { display:block; font-weight:700; margin: 10px 0 6px; }
     input, select, textarea, button {
       width:100%; padding:10px; border-radius:10px; border:1px solid #ccc; box-sizing:border-box; font-size:14px;
     }
-    textarea { min-height:140px; resize: vertical; }
+    textarea { min-height:160px; resize: vertical; }
     button { cursor:pointer; border:none; background:#1f7a5b; color:#fff; font-weight:800; }
     button.secondary { background:#444; }
     button.ghost { background:#eaeaea; color:#222; border:1px solid #ddd; }
@@ -35,11 +35,11 @@
 <body>
   <h1>Générateur de messages + mini CRM</h1>
   <p>
-    <span class="pill">Export / Import CSV</span> • gratuit • fonctionne partout
+    <span class="pill">CSV + statuts + relances auto</span> • gratuit • fonctionne partout
   </p>
 
   <div class="grid">
-    <!-- LEFT: FORM + OUTPUT -->
+    <!-- LEFT -->
     <div class="card">
       <div class="row3">
         <div>
@@ -97,7 +97,7 @@
         </div>
       </div>
 
-      <div class="row2">
+      <div class="row3">
         <div>
           <label for="persona">Type de personne</label>
           <select id="persona">
@@ -121,24 +121,49 @@
             <option value="curiosite">Curiosité / apprendre</option>
           </select>
         </div>
+
+        <div>
+          <label for="statut">Statut</label>
+          <select id="statut">
+            <option value="Nouveau">Nouveau</option>
+            <option value="Répondu">Répondu</option>
+            <option value="À relancer" selected>À relancer</option>
+            <option value="RDV pris">RDV pris</option>
+            <option value="À ne plus contacter">À ne plus contacter</option>
+          </select>
+        </div>
       </div>
 
       <div class="row2">
         <div>
           <label for="dernier">Dernier contact</label>
           <input id="dernier" type="date" />
+          <div class="small">Optionnel : sert au contexte du message.</div>
         </div>
         <div>
+          <label for="prochaine">Prochaine relance</label>
+          <input id="prochaine" type="date" />
+          <div class="small">Peut être auto-remplie quand tu “Ajoutes/MAJ”.</div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
           <label for="centre">Centres d’intérêt</label>
-          <input id="centre" placeholder="Ex: sport, voyage, famille..." />
+          <input id="centre" placeholder="Ex: sport, voyage..." />
+        </div>
+        <div>
+          <label for="dateCreation">Date création</label>
+          <input id="dateCreation" type="date" disabled />
+          <div class="small">Automatique à la première sauvegarde.</div>
         </div>
       </div>
 
       <label for="accroche">Accroche / contexte</label>
-      <input id="accroche" placeholder="Ex: ta story / ton post / ton voyage..." />
+      <input id="accroche" placeholder="Ex: ta story / ton post..." />
 
       <label for="note">Note (CRM)</label>
-      <input id="note" placeholder="Ex: rencontré via story, aime voyager, à relancer mardi..." />
+      <input id="note" placeholder="Ex: aime voyager, relance mardi, etc." />
 
       <div class="actions">
         <button id="btnGen">Générer</button>
@@ -155,7 +180,7 @@
       <div class="small mono" id="debug" style="margin-top:8px;"></div>
     </div>
 
-    <!-- RIGHT: CONTACTS + CSV -->
+    <!-- RIGHT -->
     <div class="card">
       <div class="inline">
         <div>
@@ -177,7 +202,8 @@
       </div>
 
       <div class="small">
-        Colonnes CSV : <span class="mono">prenom,plateforme,relation,objectif,style,longueur,persona,intention,dernier,centre,accroche,note</span>
+        Colonnes CSV :
+        <span class="mono">prenom,plateforme,relation,objectif,style,longueur,persona,intention,statut,date_creation,dernier,prochaine_relance,centre,accroche,note</span>
       </div>
 
       <table>
@@ -185,7 +211,8 @@
           <tr>
             <th>Prénom</th>
             <th>Plateforme</th>
-            <th>Dernier</th>
+            <th>Statut</th>
+            <th>Prochaine relance</th>
             <th>Note</th>
           </tr>
         </thead>
@@ -193,7 +220,7 @@
       </table>
 
       <div class="small" style="margin-top:10px;">
-        Astuce : l’outil sauvegarde en local sur ce navigateur (gratuit). Le CSV sert à transférer/backup vers Google Sheets.
+        Astuce : “À relancer” + Objectif = Relance J+7/J+14 → calcule automatiquement la prochaine relance.
       </div>
     </div>
   </div>
@@ -202,8 +229,26 @@
     const $ = (id) => document.getElementById(id);
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     const clean = (s) => (s || "").trim();
+    const STORAGE_KEY = "mlm_contacts_v2";
 
-    const STORAGE_KEY = "mlm_contacts_v1";
+    // --------- dates helpers ---------
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function addDaysISO(baseISO, addDays) {
+      const base = baseISO ? new Date(baseISO + "T00:00:00") : new Date();
+      const d = new Date(base.getTime());
+      d.setDate(d.getDate() + addDays);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
 
     function daysSince(dateStr) {
       if (!dateStr) return null;
@@ -214,75 +259,56 @@
       return Math.floor(ms / (1000 * 60 * 60 * 24));
     }
 
-    // ------------------ MESSAGE GEN ------------------
+    // --------- message generator (same engine) ---------
     function tonePacks(style, plateforme, prenom) {
       const packs = {
-        pro: {
-          hello: [`Bonjour ${prenom},`, `Bonjour ${prenom} 👋`, `Hello ${prenom},`],
-          outro: [`Bonne journée,`, `Au plaisir d’échanger,`, `Bien à vous,`]
-        },
-        neutre: {
-          hello: [`Salut ${prenom} !`, `Hello ${prenom} 👋`, `Coucou ${prenom} !`],
-          outro: [`Bonne journée à toi ✨`, `À bientôt 🙂`, `Force à toi 💪`]
-        },
-        fun: {
-          hello: [`Yo ${prenom} 😄`, `Hey ${prenom} 👋`, `Coucou ${prenom} 😄`],
-          outro: [`Belle journée à toi ✨`, `À très vite 😄`, `Force & good vibes 💪`],
-          funWords: [`la jungle de ${plateforme}`, `le vortex des notifications`, `l’algorithme farceur`]
-        }
+        pro: { hello:[`Bonjour ${prenom},`,`Bonjour ${prenom} 👋`,`Hello ${prenom},`], outro:[`Bonne journée,`,`Au plaisir d’échanger,`,`Bien à vous,`] },
+        neutre: { hello:[`Salut ${prenom} !`,`Hello ${prenom} 👋`,`Coucou ${prenom} !`], outro:[`Bonne journée à toi ✨`,`À bientôt 🙂`,`Force à toi 💪`] },
+        fun: { hello:[`Yo ${prenom} 😄`,`Hey ${prenom} 👋`,`Coucou ${prenom} 😄`], outro:[`Belle journée à toi ✨`,`À très vite 😄`,`Force & good vibes 💪`], funWords:[`la jungle de ${plateforme}`,`le vortex des notifications`,`l’algorithme farceur`] }
       };
       return packs[style] || packs.neutre;
     }
 
     function personaLine(persona, styleKey) {
       const map = {
-        entrepreneur: { pro:`J’aime bien échanger avec des personnes orientées projets.`, neutre:`J’aime bien connecter avec des gens qui construisent des projets.`, fun:`J’aime les gens qui build des trucs 😄` },
-        parent:       { pro:`Toujours intéressant d’échanger avec des personnes qui jonglent avec la vie de famille.`, neutre:`Respect à ceux qui gèrent la famille et mille choses.`, fun:`Team multitâches ultime, respect 😄` },
-        sportif:      { pro:`La discipline et les habitudes qui font progresser m’intéressent.`, neutre:`Les vibes sport/santé, j’aime bien.`, fun:`Team progression + bonne humeur 😄` },
-        voyage:       { pro:`Les profils curieux et ouverts, surtout voyage, j’aime bien.`, neutre:`Les profils voyage/lifestyle, ça donne envie de bouger.`, fun:`Ton contenu donne envie de prendre un billet 😄` },
-        etudiant:     { pro:`J’aime bien échanger avec des personnes en phase de construction.`, neutre:`J’aime bien connecter avec des gens qui démarrent.`, fun:`Grosse énergie “je construis mon futur” 😄` },
-        createur:     { pro:`Je respecte beaucoup la constance et la créativité.`, neutre:`On sent la patte chez les créateurs.`, fun:`Créateur = sport de haut niveau 😄` },
-        job:          { pro:`Échanger sur objectifs et évolution pro, je trouve ça intéressant.`, neutre:`J’aime bien parler objectifs et organisation.`, fun:`Team “on progresse sans se cramer” 😄` },
-        indefini:     { pro:`Je suis partant pour un échange simple et humain.`, neutre:`J’aime bien les échanges simples, humains.`, fun:`Je passe pour la vibe, simple 😄` }
+        entrepreneur:{ pro:`J’aime bien échanger avec des personnes orientées projets.`, neutre:`J’aime bien connecter avec des gens qui construisent des projets.`, fun:`J’aime les gens qui build des trucs 😄` },
+        parent:{ pro:`Échanger avec des personnes qui jonglent avec la vie de famille, c’est toujours intéressant.`, neutre:`Respect à ceux qui gèrent la famille et mille choses.`, fun:`Team multitâches ultime, respect 😄` },
+        sportif:{ pro:`La discipline et les habitudes qui font progresser m’intéressent.`, neutre:`Les vibes sport/santé, j’aime bien.`, fun:`Team progression + bonne humeur 😄` },
+        voyage:{ pro:`Les profils curieux et ouverts, surtout voyage, j’aime bien.`, neutre:`Voyage/lifestyle, ça donne envie de bouger.`, fun:`Ton contenu donne envie de prendre un billet 😄` },
+        etudiant:{ pro:`J’aime bien échanger avec des personnes en phase de construction.`, neutre:`J’aime bien connecter avec des gens qui démarrent.`, fun:`Grosse énergie “je construis mon futur” 😄` },
+        createur:{ pro:`Je respecte beaucoup la constance et la créativité.`, neutre:`On sent la patte chez les créateurs.`, fun:`Créateur = sport de haut niveau 😄` },
+        job:{ pro:`Échanger sur objectifs et évolution pro, je trouve ça intéressant.`, neutre:`J’aime bien parler objectifs et organisation.`, fun:`Team “on progresse sans se cramer” 😄` },
+        indefini:{ pro:`Je suis partant pour un échange simple et humain.`, neutre:`J’aime bien les échanges simples, humains.`, fun:`Je passe pour la vibe, simple 😄` }
       };
       const b = map[persona] || map.indefini;
       return b[styleKey] || b.neutre;
     }
 
     function buildMessage(p) {
-      const {
-        prenom, plateforme, relation, objectif, style, lengthMode,
-        persona, intention, accroche, centre, days
-      } = p;
-
+      const { prenom, plateforme, relation, objectif, style, lengthMode, persona, intention, accroche, centre, days } = p;
       const pack = tonePacks(style, plateforme, prenom);
       const styleKey = (style === "pro" ? "pro" : style === "fun" ? "fun" : "neutre");
 
       const introByRel = {
         froid: {
-          pro: [`Je me permets de vous écrire après être tombé sur votre profil sur ${plateforme}.`, `Je découvre votre profil sur ${plateforme} et je souhaitais vous saluer.`],
-          neutre: [`Je te découvre sur ${plateforme} et j’aime bien ton univers.`, `Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`],
-          fun: [`Je viens de tomber sur ton profil sur ${plateforme} : l’algorithme a bien bossé 😄`, `Je passe par ${plateforme} et je me dis : “ok… vibe intéressante ici.”`]
+          pro:[`Je me permets de vous écrire après être tombé sur votre profil sur ${plateforme}.`,`Je découvre votre profil sur ${plateforme} et je souhaitais vous saluer.`],
+          neutre:[`Je te découvre sur ${plateforme} et j’aime bien ton univers.`,`Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`],
+          fun:[`Je viens de tomber sur ton profil sur ${plateforme} : l’algorithme a bien bossé 😄`,`Je passe par ${plateforme} et je me dis : “ok… vibe intéressante ici.”`]
         },
         "tiède": {
-          pro: [`Je reviens vers vous, je me disais que cela valait le coup de reprendre contact.`, `Petit message pour reprendre des nouvelles.`],
-          neutre: [`Je repasse te dire bonjour 🙂`, `Je me suis dit que ça valait le coup de reprendre contact.`],
-          fun: [`Je reviens dans ta DM-zone 😄`, `Je repasse avant que l’algorithme nous sépare 😄`]
+          pro:[`Je reviens vers vous, je me disais que cela valait le coup de reprendre contact.`,`Petit message pour reprendre des nouvelles.`],
+          neutre:[`Je repasse te dire bonjour 🙂`,`Je me suis dit que ça valait le coup de reprendre contact.`],
+          fun:[`Je reviens dans ta DM-zone 😄`,`Je repasse avant que l’algorithme nous sépare 😄`]
         },
         chaud: {
-          pro: [`J’espère que vous allez bien. Je me permets de prendre des nouvelles.`, `Bonjour, je passais simplement prendre des nouvelles.`],
-          neutre: [`Hey ${prenom}, j’espère que tu vas bien 😊`, `Yo ${prenom} ! Petite pensée du jour 😄`],
-          fun: [`Yo ${prenom} ! Comment va la légende ? 😄`, `Petit check-up vibe du jour 👀`]
+          pro:[`J’espère que vous allez bien. Je me permets de prendre des nouvelles.`,`Bonjour, je passais simplement prendre des nouvelles.`],
+          neutre:[`Hey ${prenom}, j’espère que tu vas bien 😊`,`Yo ${prenom} ! Petite pensée du jour 😄`],
+          fun:[`Yo ${prenom} ! Comment va la légende ? 😄`,`Petit check-up vibe du jour 👀`]
         }
       };
 
-      const hook = accroche
-        ? [`J’ai vu ${accroche} — ça m’a fait sourire.`, `Ton ${accroche} m’a intrigué.`]
-        : [`Au fait, quoi de neuf en ce moment ?`, `Tu deviens quoi ces temps-ci ?`];
-
-      const interest = centre
-        ? [`Tu es toujours à fond sur ${centre} ?`, `Ça avance tes trucs autour de ${centre} ?`]
-        : [`Tu es sur quoi en ce moment ?`, `Qu’est-ce qui t’occupe ces jours-ci ?`];
+      const hook = accroche ? [`J’ai vu ${accroche} — ça m’a fait sourire.`,`Ton ${accroche} m’a intrigué.`] : [`Au fait, quoi de neuf en ce moment ?`,`Tu deviens quoi ces temps-ci ?`];
+      const interest = centre ? [`Tu es toujours à fond sur ${centre} ?`,`Ça avance tes trucs autour de ${centre} ?`] : [`Tu es sur quoi en ce moment ?`,`Qu’est-ce qui t’occupe ces jours-ci ?`];
 
       const daysLine = (typeof days === "number")
         ? (days <= 3 ? (styleKey==="pro" ? `Nous avons échangé récemment, je me permets un petit message.` : `On s’est parlé récemment, je repasse vite fait.`)
@@ -291,35 +317,14 @@
         : null;
 
       const invitationSoft = {
-        reseau: {
-          pro: [`Si vous le souhaitez, on peut échanger quelques minutes, simplement pour faire connaissance.`],
-          neutre: [`Si ça te dit, on se cale 10 minutes pour papoter et faire connaissance.`],
-          fun: [`On se cale 10 minutes ? Version papotage propre 😄`]
-        },
+        reseau: { pro:[`Si vous le souhaitez, on peut échanger quelques minutes, simplement pour faire connaissance.`], neutre:[`Si ça te dit, on se cale 10 minutes pour papoter et faire connaissance.`], fun:[`On se cale 10 minutes ? Version papotage propre 😄`] },
         opportunite: {
-          pro: [
-            `J’ai un sujet qui pourrait vous intéresser. Si vous êtes ouvert, on peut en parler 10 minutes, sans engagement.`,
-            `J’ai une idée/opportunité que je partage parfois à des personnes qui ont votre profil. Si vous êtes curieux, je vous explique.`
-          ],
-          neutre: [
-            `J’ai un truc qui pourrait te plaire (rien d’agressif). Si t’es curieux, je t’explique en 10 minutes.`,
-            `J’ai une idée/opportunité que je partage à quelques personnes. Si ça t’intrigue, je peux t’en dire plus.`
-          ],
-          fun: [
-            `J’ai un petit truc à te partager. Pas un pitch de robot 😄 Si t’es curieux, 10 minutes et c’est plié.`,
-            `J’ai une idée à te proposer. Si tu dis “pourquoi pas”, je t’explique vite fait 😄`
-          ]
+          pro:[`J’ai un sujet qui pourrait vous intéresser. Si vous êtes ouvert, on peut en parler 10 minutes, sans engagement.`,`J’ai une idée/opportunité que je partage parfois à des personnes qui ont votre profil. Si vous êtes curieux, je vous explique.`],
+          neutre:[`J’ai un truc qui pourrait te plaire (rien d’agressif). Si t’es curieux, je t’explique en 10 minutes.`,`J’ai une idée/opportunité que je partage à quelques personnes. Si ça t’intrigue, je peux t’en dire plus.`],
+          fun:[`J’ai un petit truc à te partager. Pas un pitch de robot 😄 Si t’es curieux, 10 minutes et c’est plié.`,`J’ai une idée à te proposer. Si tu dis “pourquoi pas”, je t’explique vite fait 😄`]
         },
-        collab: {
-          pro: [`Je pensais à une possible collaboration/échange d’idées. Si cela vous intéresse, on peut en parler.`],
-          neutre: [`Je me disais qu’on pourrait échanger sur un projet / une collab possible.`],
-          fun: [`Je sens une vibe “collab” possible 😄 On en parle ?`]
-        },
-        curiosite: {
-          pro: [`Je suis curieux d’en savoir plus sur ce que vous faites en ce moment.`],
-          neutre: [`Je suis curieux : tu construis quoi en ce moment ?`],
-          fun: [`Je suis curieux : tu build quoi en ce moment ? 😄`]
-        }
+        collab: { pro:[`Je pensais à une possible collaboration/échange d’idées. Si cela vous intéresse, on peut en parler.`], neutre:[`Je me disais qu’on pourrait échanger sur un projet / une collab possible.`], fun:[`Je sens une vibe “collab” possible 😄 On en parle ?`] },
+        curiosite: { pro:[`Je suis curieux d’en savoir plus sur ce que vous faites en ce moment.`], neutre:[`Je suis curieux : tu construis quoi en ce moment ?`], fun:[`Je suis curieux : tu build quoi en ce moment ? 😄`] }
       };
 
       const goal = {
@@ -335,50 +340,23 @@
       const goalLine = pick(goal[objectif] || goal.discussion.neutre);
       const outro = pick(pack.outro);
 
-      const lines = [];
-      lines.push(pick(pack.hello));
-      lines.push("");
-
+      const lines = [pick(pack.hello), ""];
       if (lengthMode === "court") {
-        lines.push(intro);
-        lines.push(personaTxt);
-        lines.push("");
-        lines.push(goalLine);
-        lines.push("");
-        lines.push(outro);
+        lines.push(intro, personaTxt, "", goalLine, "", outro);
         return lines.join("\n");
       }
-
       if (lengthMode === "normal") {
         lines.push(intro);
-        if (Math.random() < 0.5) { lines.push(pick(hook)); lines.push(pick(interest)); }
-        else { lines.push(pick(interest)); lines.push(pick(hook)); }
+        (Math.random() < 0.5) ? lines.push(pick(hook), pick(interest)) : lines.push(pick(interest), pick(hook));
         lines.push(personaTxt);
         if (daysLine) lines.push(daysLine);
-        lines.push("");
-        lines.push(goalLine);
-        lines.push("");
-        lines.push(outro);
+        lines.push("", goalLine, "", outro);
         return lines.join("\n");
       }
-
-      // long
-      const human = {
-        pro: [`Rien d’urgent, c’est surtout pour garder un contact simple.`],
-        neutre: [`Rien d’urgent, c’est juste pour garder le lien.`],
-        fun: [`Promis, pas de script robot ici 🤖❌`]
-      };
-
-      lines.push(intro);
-      lines.push(pick(hook));
-      lines.push(pick(interest));
-      lines.push(personaTxt);
+      const human = { pro:[`Rien d’urgent, c’est surtout pour garder un contact simple.`], neutre:[`Rien d’urgent, c’est juste pour garder le lien.`], fun:[`Promis, pas de script robot ici 🤖❌`] };
+      lines.push(intro, pick(hook), pick(interest), personaTxt);
       if (daysLine) lines.push(daysLine);
-      lines.push(pick(human[styleKey]));
-      lines.push("");
-      lines.push(goalLine);
-      lines.push("");
-      lines.push(outro);
+      lines.push(pick(human[styleKey]), "", goalLine, "", outro);
       return lines.join("\n");
     }
 
@@ -405,22 +383,14 @@
         (typeof days === "number") ? `Dernier contact : il y a ${days} jour(s).` : `Astuce : ajoute une date pour contextualiser.`;
     }
 
-    // ------------------ CONTACTS (LOCAL) ------------------
+    // --------- contacts (local) ---------
     function loadContacts() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : [];
-      } catch {
-        return [];
-      }
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+      catch { return []; }
     }
-
-    function saveContacts(list) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    }
+    function saveContacts(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
 
     function contactKey(c) {
-      // clé simple : prénom + plateforme (tu peux améliorer après)
       return `${(c.prenom||"").toLowerCase()}__${(c.plateforme||"").toLowerCase()}`;
     }
 
@@ -434,11 +404,26 @@
         longueur: $("lengthMode").value,
         persona: $("persona").value,
         intention: $("intention").value,
+        statut: $("statut").value,
+        date_creation: $("dateCreation").value || "",
         dernier: $("dernier").value || "",
+        prochaine_relance: $("prochaine").value || "",
         centre: clean($("centre").value),
         accroche: clean($("accroche").value),
         note: clean($("note").value)
       };
+    }
+
+    function computeNextFollowUp(c) {
+      // Si statut n'est pas "À relancer", on ne touche pas (sauf si vide et statut À relancer)
+      if (c.statut !== "À relancer") return c.prochaine_relance || "";
+
+      // Base : si dernier contact existe => base=dernier sinon aujourd'hui
+      const base = c.dernier || todayISO();
+
+      // Si objectif relance7/14 => respect
+      if (c.objectif === "relance14") return addDaysISO(base, 14);
+      return addDaysISO(base, 7); // défaut relance7
     }
 
     function fillFormFromContact(c) {
@@ -450,7 +435,10 @@
       $("lengthMode").value = c.longueur || "normal";
       $("persona").value = c.persona || "indefini";
       $("intention").value = c.intention || "reseau";
+      $("statut").value = c.statut || "Nouveau";
+      $("dateCreation").value = c.date_creation || "";
       $("dernier").value = c.dernier || "";
+      $("prochaine").value = c.prochaine_relance || "";
       $("centre").value = c.centre || "";
       $("accroche").value = c.accroche || "";
       $("note").value = c.note || "";
@@ -461,21 +449,16 @@
       const contacts = loadContacts();
       const sel = $("contactSelect");
       sel.innerHTML = "";
+      const o0 = document.createElement("option");
+      o0.value = ""; o0.textContent = "— sélectionner —";
+      sel.appendChild(o0);
 
-      const opt0 = document.createElement("option");
-      opt0.value = "";
-      opt0.textContent = "— sélectionner —";
-      sel.appendChild(opt0);
-
-      contacts
-        .slice()
-        .sort((a,b) => (a.prenom||"").localeCompare(b.prenom||""))
-        .forEach((c, idx) => {
-          const o = document.createElement("option");
-          o.value = String(idx);
-          o.textContent = `${c.prenom || "(sans prénom)"} • ${c.plateforme || ""}`;
-          sel.appendChild(o);
-        });
+      contacts.slice().sort((a,b)=> (a.prenom||"").localeCompare(b.prenom||"")).forEach((c, idx) => {
+        const o = document.createElement("option");
+        o.value = String(idx);
+        o.textContent = `${c.prenom || "(sans prénom)"} • ${c.plateforme || ""}`;
+        sel.appendChild(o);
+      });
 
       const tbody = $("contactTableBody");
       tbody.innerHTML = "";
@@ -490,24 +473,33 @@
 
         const td1 = document.createElement("td"); td1.textContent = c.prenom || "";
         const td2 = document.createElement("td"); td2.textContent = c.plateforme || "";
-        const td3 = document.createElement("td"); td3.textContent = c.dernier || "";
-        const td4 = document.createElement("td"); td4.textContent = c.note || "";
-        tr.append(td1, td2, td3, td4);
+        const td3 = document.createElement("td"); td3.textContent = c.statut || "";
+        const td4 = document.createElement("td"); td4.textContent = c.prochaine_relance || "";
+        const td5 = document.createElement("td"); td5.textContent = c.note || "";
+        tr.append(td1, td2, td3, td4, td5);
         tbody.appendChild(tr);
       });
     }
 
     function addOrUpdateContact() {
       const c = getFormAsContact();
-      if (!c.prenom) {
-        alert("Ajoute au moins un prénom pour enregistrer le contact 🙂");
-        return;
-      }
+      if (!c.prenom) { alert("Ajoute au moins un prénom pour enregistrer 🙂"); return; }
+
       const contacts = loadContacts();
       const key = contactKey(c);
       const i = contacts.findIndex(x => contactKey(x) === key);
-      if (i >= 0) contacts[i] = c;
-      else contacts.push(c);
+
+      // Date création auto si nouveau
+      if (i < 0 && !c.date_creation) c.date_creation = todayISO();
+
+      // Prochaine relance auto si statut "À relancer" et champ vide OU si tu veux recalculer : on recalc si statut À relancer
+      c.prochaine_relance = computeNextFollowUp(c);
+
+      // Met à jour l'affichage du champ dateCreation + prochaine
+      $("dateCreation").value = c.date_creation;
+      $("prochaine").value = c.prochaine_relance;
+
+      if (i >= 0) contacts[i] = c; else contacts.push(c);
       saveContacts(contacts);
       refreshUI();
     }
@@ -525,8 +517,8 @@
       refreshUI();
     }
 
-    // ------------------ CSV ------------------
-    const CSV_HEADERS = ["prenom","plateforme","relation","objectif","style","longueur","persona","intention","dernier","centre","accroche","note"];
+    // --------- CSV ---------
+    const CSV_HEADERS = ["prenom","plateforme","relation","objectif","style","longueur","persona","intention","statut","date_creation","dernier","prochaine_relance","centre","accroche","note"];
 
     function escapeCSV(value) {
       const s = String(value ?? "");
@@ -540,8 +532,7 @@
 
     function exportCSV() {
       const contacts = loadContacts();
-      const lines = [];
-      lines.push(CSV_HEADERS.join(","));
+      const lines = [CSV_HEADERS.join(",")];
       contacts.forEach(c => lines.push(toCSVRow(c)));
       const csv = lines.join("\n");
 
@@ -558,13 +549,10 @@
     }
 
     function parseCSV(text) {
-      // parser simple (gère guillemets/doubles guillemets). Suffisant pour un CSV “propre”.
       const rows = [];
       let i = 0, field = "", row = [], inQuotes = false;
-
       while (i < text.length) {
         const ch = text[i];
-
         if (inQuotes) {
           if (ch === '"') {
             const next = text[i+1];
@@ -574,14 +562,13 @@
           field += ch; i++; continue;
         } else {
           if (ch === '"') { inQuotes = true; i++; continue; }
-          if (ch === ',') { row.push(field); field = ""; i++; continue; }
-          if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+          if (ch === ',') { row.push(field); field=""; i++; continue; }
+          if (ch === '\n') { row.push(field); rows.push(row); row=[]; field=""; i++; continue; }
           if (ch === '\r') { i++; continue; }
           field += ch; i++; continue;
         }
       }
-      row.push(field);
-      rows.push(row);
+      row.push(field); rows.push(row);
       return rows;
     }
 
@@ -593,14 +580,10 @@
         if (rows.length < 1) { alert("CSV vide."); return; }
 
         const headers = rows[0].map(h => h.trim());
-        const headerMap = {};
-        headers.forEach((h, idx) => headerMap[h] = idx);
+        const map = {};
+        headers.forEach((h, idx) => map[h] = idx);
 
-        // Vérif minimale : il faut au moins "prenom"
-        if (headerMap["prenom"] == null) {
-          alert("CSV invalide : colonne 'prenom' introuvable.");
-          return;
-        }
+        if (map["prenom"] == null) { alert("CSV invalide : colonne 'prenom' introuvable."); return; }
 
         const imported = [];
         for (let r = 1; r < rows.length; r++) {
@@ -609,11 +592,11 @@
 
           const obj = {};
           CSV_HEADERS.forEach(h => {
-            const idx = headerMap[h];
+            const idx = map[h];
             obj[h] = (idx != null && idx < line.length) ? (line[idx] || "") : "";
           });
 
-          // valeurs par défaut (si manquantes)
+          // defaults
           if (!obj.plateforme) obj.plateforme = "Instagram";
           if (!obj.relation) obj.relation = "froid";
           if (!obj.objectif) obj.objectif = "discussion";
@@ -621,27 +604,32 @@
           if (!obj.longueur) obj.longueur = "normal";
           if (!obj.persona) obj.persona = "indefini";
           if (!obj.intention) obj.intention = "reseau";
+          if (!obj.statut) obj.statut = "Nouveau";
+          if (!obj.date_creation) obj.date_creation = todayISO();
+
+          // if status is À relancer and next is empty => compute
+          if (obj.statut === "À relancer" && !obj.prochaine_relance) {
+            obj.prochaine_relance = computeNextFollowUp(obj);
+          }
 
           if (clean(obj.prenom)) imported.push(obj);
         }
 
-        // Merge : même clé => update
         const contacts = loadContacts();
         imported.forEach(c => {
           const key = contactKey(c);
           const i = contacts.findIndex(x => contactKey(x) === key);
-          if (i >= 0) contacts[i] = c;
-          else contacts.push(c);
+          if (i >= 0) contacts[i] = c; else contacts.push(c);
         });
 
         saveContacts(contacts);
         refreshUI();
-        alert(`Import terminé ✅ (${imported.length} contact(s) importé(s))`);
+        alert(`Import terminé ✅ (${imported.length} contact(s))`);
       };
       reader.readAsText(file, "utf-8");
     }
 
-    // ------------------ EVENTS ------------------
+    // --------- events ---------
     $("btnGen").addEventListener("click", generate);
     $("btnRandom").addEventListener("click", generate);
 
@@ -658,7 +646,8 @@
     });
 
     $("btnClear").addEventListener("click", () => {
-      ["prenom","centre","accroche","note","dernier"].forEach(id => $(id).value = "");
+      ["prenom","centre","accroche","note","dernier","prochaine"].forEach(id => $(id).value = "");
+      $("dateCreation").value = "";
       $("plateforme").value = "Instagram";
       $("relation").value = "froid";
       $("objectif").value = "discussion";
@@ -666,6 +655,7 @@
       $("lengthMode").value = "normal";
       $("persona").value = "indefini";
       $("intention").value = "reseau";
+      $("statut").value = "À relancer";
       $("result").value = "";
       $("debug").textContent = "";
       $("daysInfo").textContent = "";
@@ -685,7 +675,6 @@
     });
 
     $("btnExport").addEventListener("click", exportCSV);
-
     $("btnImportBtn").addEventListener("click", () => $("importFile").click());
     $("importFile").addEventListener("change", (e) => {
       const file = e.target.files && e.target.files[0];
@@ -694,9 +683,23 @@
       e.target.value = "";
     });
 
+    // Auto recalcul si tu changes (statut/objectif/dernier)
+    function autoSuggestNext() {
+      const statut = $("statut").value;
+      if (statut !== "À relancer") return;
+      const base = $("dernier").value || todayISO();
+      const obj = $("objectif").value;
+      const next = (obj === "relance14") ? addDaysISO(base, 14) : addDaysISO(base, 7);
+      $("prochaine").value = next;
+    }
+    $("statut").addEventListener("change", autoSuggestNext);
+    $("objectif").addEventListener("change", autoSuggestNext);
+    $("dernier").addEventListener("change", autoSuggestNext);
+
     // init
     refreshUI();
     generate();
+    autoSuggestNext();
   </script>
 </body>
 </html>
