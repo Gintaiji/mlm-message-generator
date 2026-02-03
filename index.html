@@ -1,295 +1,705 @@
-diff --git a/index.html b/index.html
-index 88319a4a8e68a9bb18c0c53317f32cbe62045bbf..c057eed20262ab1d78c9ff11ab458358b00f1be9 100644
---- a/index.html
-+++ b/index.html
-@@ -8,50 +8,54 @@
-     body { font-family: Arial, sans-serif; max-width: 1250px; margin: 24px auto; padding: 0 16px; }
-     h1 { margin: 0 0 6px; }
-     p { margin: 0 0 14px; color: #444; }
-     .grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 12px; }
-     .card { background:#fafafa; border:1px solid #eee; border-radius:16px; padding:14px; }
-     label { display:block; font-weight:700; margin: 10px 0 6px; }
-     input, select, textarea, button {
-       width:100%; padding:10px; border-radius:10px; border:1px solid #ccc; box-sizing:border-box; font-size:14px;
-     }
-     textarea { min-height:160px; resize: vertical; }
-     button { cursor:pointer; border:none; background:#1f7a5b; color:#fff; font-weight:800; }
-     button.secondary { background:#444; }
-     button.ghost { background:#eaeaea; color:#222; border:1px solid #ddd; }
-     .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-     .small { font-size:12px; color:#666; }
-     .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-     .row3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
-     .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#e9f5ef; border:1px solid #cfe8dd; font-size:12px; color:#185a43; }
-     table { width:100%; border-collapse: collapse; margin-top:10px; background:#fff; border-radius:12px; overflow:hidden; }
-     th, td { border-bottom:1px solid #eee; padding:8px; font-size:13px; text-align:left; vertical-align:top; }
-     th { background:#f3f3f3; }
-     tr:hover { background:#fbfbfb; }
-     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-     .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-     .inline > * { flex: 1; min-width: 180px; }
-+    .badge-urgent { display:inline-block; margin-left:6px; padding:2px 6px; border-radius:999px; background:#ffe5e5; border:1px solid #f5b5b5; color:#b00020; font-size:11px; font-weight:700; }
-+    .filter-toggle { display:flex; gap:8px; align-items:center; margin-top:10px; }
-+    .filter-toggle input { width:auto; }
-+    .search-input { margin-top:10px; }
-   </style>
- </head>
- <body>
-   <h1>Générateur de messages + mini CRM</h1>
-   <p>
-     <span class="pill">CSV + statuts + relances auto</span> • gratuit • fonctionne partout
-   </p>
- 
-   <div class="grid">
-     <!-- LEFT -->
-     <div class="card">
-       <div class="row3">
-         <div>
-           <label for="prenom">Prénom</label>
-           <input id="prenom" placeholder="Ex: Julie" />
-         </div>
-         <div>
-           <label for="plateforme">Plateforme</label>
-           <select id="plateforme">
-             <option>Instagram</option>
-             <option>Facebook</option>
-             <option>TikTok</option>
-             <option>LinkedIn</option>
-             <option>WhatsApp</option>
-           </select>
-@@ -184,50 +188,57 @@
-     <div class="card">
-       <div class="inline">
-         <div>
-           <label for="contactSelect">Contacts</label>
-           <select id="contactSelect"></select>
-           <div class="small">Sélectionne → ça remplit le formulaire.</div>
-         </div>
-         <div>
-           <label>&nbsp;</label>
-           <button class="ghost" id="btnAdd">+ Ajouter/Mettre à jour</button>
-         </div>
-       </div>
- 
-       <div class="actions">
-         <button class="ghost" id="btnExport">Exporter CSV</button>
-         <button class="ghost" id="btnImportBtn">Importer CSV</button>
-         <input id="importFile" type="file" accept=".csv,text/csv" style="display:none;" />
-         <button class="secondary" id="btnDelete">Supprimer contact</button>
-       </div>
- 
-       <div class="small">
-         Colonnes CSV :
-         <span class="mono">prenom,plateforme,relation,objectif,style,longueur,persona,intention,statut,date_creation,dernier,prochaine_relance,centre,accroche,note</span>
-       </div>
- 
-+      <label class="filter-toggle">
-+        <input type="checkbox" id="filterUrgent" />
-+        À relancer (≤ aujourd’hui)
-+      </label>
-+
-+      <input id="searchInput" class="search-input" placeholder="Rechercher prénom, note, plateforme…" />
-+
-       <table>
-         <thead>
-           <tr>
-             <th>Prénom</th>
-             <th>Plateforme</th>
-             <th>Statut</th>
-             <th>Prochaine relance</th>
-             <th>Note</th>
-           </tr>
-         </thead>
-         <tbody id="contactTableBody"></tbody>
-       </table>
- 
-       <div class="small" style="margin-top:10px;">
-         Astuce : “À relancer” + Objectif = Relance J+7/J+14 → calcule automatiquement la prochaine relance.
-       </div>
-     </div>
-   </div>
- 
-   <script>
-     const $ = (id) => document.getElementById(id);
-     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-     const clean = (s) => (s || "").trim();
-     const STORAGE_KEY = "mlm_contacts_v2";
- 
-@@ -423,79 +434,125 @@
- 
-       // Si objectif relance7/14 => respect
-       if (c.objectif === "relance14") return addDaysISO(base, 14);
-       return addDaysISO(base, 7); // défaut relance7
-     }
- 
-     function fillFormFromContact(c) {
-       $("prenom").value = c.prenom || "";
-       $("plateforme").value = c.plateforme || "Instagram";
-       $("relation").value = c.relation || "froid";
-       $("objectif").value = c.objectif || "discussion";
-       $("styleTone").value = c.style || "neutre";
-       $("lengthMode").value = c.longueur || "normal";
-       $("persona").value = c.persona || "indefini";
-       $("intention").value = c.intention || "reseau";
-       $("statut").value = c.statut || "Nouveau";
-       $("dateCreation").value = c.date_creation || "";
-       $("dernier").value = c.dernier || "";
-       $("prochaine").value = c.prochaine_relance || "";
-       $("centre").value = c.centre || "";
-       $("accroche").value = c.accroche || "";
-       $("note").value = c.note || "";
-       generate();
-     }
- 
-+    function isUrgent(c) {
-+      if (c.statut !== "À relancer") return false;
-+      if (!c.prochaine_relance) return false;
-+      const today = todayISO();
-+      return c.prochaine_relance <= today;
-+    }
-+
-+    function compareFollowUpAsc(a, b) {
-+      const dateA = clean(a.prochaine_relance);
-+      const dateB = clean(b.prochaine_relance);
-+      if (!dateA && !dateB) return (a.prenom || "").localeCompare(b.prenom || "");
-+      if (!dateA) return 1;
-+      if (!dateB) return -1;
-+      if (dateA === dateB) return (a.prenom || "").localeCompare(b.prenom || "");
-+      return dateA.localeCompare(dateB);
-+    }
-+
-+    function matchesSearch(c, query) {
-+      if (!query) return true;
-+      const q = query.toLowerCase();
-+      return [c.prenom, c.note, c.plateforme].some((value) => clean(value).toLowerCase().includes(q));
-+    }
-+
-     function refreshUI() {
-       const contacts = loadContacts();
-       const sel = $("contactSelect");
-+      const previousSelection = sel.value;
-       sel.innerHTML = "";
-       const o0 = document.createElement("option");
-       o0.value = ""; o0.textContent = "— sélectionner —";
-       sel.appendChild(o0);
- 
--      contacts.slice().sort((a,b)=> (a.prenom||"").localeCompare(b.prenom||"")).forEach((c, idx) => {
-+      contacts
-+        .map((c, idx) => ({ c, idx }))
-+        .sort((a, b) => (a.c.prenom || "").localeCompare(b.c.prenom || ""))
-+        .forEach(({ c, idx }) => {
-         const o = document.createElement("option");
-         o.value = String(idx);
-         o.textContent = `${c.prenom || "(sans prénom)"} • ${c.plateforme || ""}`;
-         sel.appendChild(o);
-       });
-+      if (previousSelection !== "") {
-+        const hasOption = Array.from(sel.options).some(opt => opt.value === previousSelection);
-+        if (hasOption) sel.value = previousSelection;
-+      }
- 
-       const tbody = $("contactTableBody");
-       tbody.innerHTML = "";
--      contacts.forEach((c, idx) => {
-+      const filterUrgent = $("filterUrgent").checked;
-+      const query = clean($("searchInput").value);
-+      contacts
-+        .map((c, idx) => ({ c, idx }))
-+        .filter(({ c }) => (!filterUrgent || isUrgent(c)) && matchesSearch(c, query))
-+        .sort((a, b) => compareFollowUpAsc(a.c, b.c))
-+        .forEach(({ c, idx }) => {
-         const tr = document.createElement("tr");
-         tr.style.cursor = "pointer";
-         tr.title = "Clique pour charger ce contact";
-         tr.addEventListener("click", () => {
-           $("contactSelect").value = String(idx);
-           fillFormFromContact(c);
-         });
- 
-         const td1 = document.createElement("td"); td1.textContent = c.prenom || "";
-         const td2 = document.createElement("td"); td2.textContent = c.plateforme || "";
--        const td3 = document.createElement("td"); td3.textContent = c.statut || "";
-+        const td3 = document.createElement("td");
-+        const statusText = document.createElement("span");
-+        statusText.textContent = c.statut || "";
-+        td3.appendChild(statusText);
-+        if (isUrgent(c)) {
-+          const urgentBadge = document.createElement("span");
-+          urgentBadge.className = "badge-urgent";
-+          urgentBadge.textContent = "URGENT";
-+          td3.appendChild(urgentBadge);
-+        }
-         const td4 = document.createElement("td"); td4.textContent = c.prochaine_relance || "";
-         const td5 = document.createElement("td"); td5.textContent = c.note || "";
-         tr.append(td1, td2, td3, td4, td5);
-         tbody.appendChild(tr);
-       });
-     }
- 
-     function addOrUpdateContact() {
-       const c = getFormAsContact();
-       if (!c.prenom) { alert("Ajoute au moins un prénom pour enregistrer 🙂"); return; }
- 
-       const contacts = loadContacts();
-       const key = contactKey(c);
-       const i = contacts.findIndex(x => contactKey(x) === key);
- 
-       // Date création auto si nouveau
-       if (i < 0 && !c.date_creation) c.date_creation = todayISO();
- 
-       // Prochaine relance auto si statut "À relancer" et champ vide OU si tu veux recalculer : on recalc si statut À relancer
-       c.prochaine_relance = computeNextFollowUp(c);
- 
-       // Met à jour l'affichage du champ dateCreation + prochaine
-       $("dateCreation").value = c.date_creation;
-       $("prochaine").value = c.prochaine_relance;
- 
-@@ -660,46 +717,48 @@
-       $("debug").textContent = "";
-       $("daysInfo").textContent = "";
-       generate();
-     });
- 
-     $("btnAdd").addEventListener("click", addOrUpdateContact);
-     $("btnDelete").addEventListener("click", deleteSelectedContact);
- 
-     $("contactSelect").addEventListener("change", () => {
-       const idx = $("contactSelect").value;
-       if (idx === "") return;
-       const contacts = loadContacts();
-       const i = Number(idx);
-       if (Number.isNaN(i) || i < 0 || i >= contacts.length) return;
-       fillFormFromContact(contacts[i]);
-     });
- 
-     $("btnExport").addEventListener("click", exportCSV);
-     $("btnImportBtn").addEventListener("click", () => $("importFile").click());
-     $("importFile").addEventListener("change", (e) => {
-       const file = e.target.files && e.target.files[0];
-       if (!file) return;
-       importCSVFile(file);
-       e.target.value = "";
-     });
-+    $("filterUrgent").addEventListener("change", refreshUI);
-+    $("searchInput").addEventListener("input", refreshUI);
- 
-     // Auto recalcul si tu changes (statut/objectif/dernier)
-     function autoSuggestNext() {
-       const statut = $("statut").value;
-       if (statut !== "À relancer") return;
-       const base = $("dernier").value || todayISO();
-       const obj = $("objectif").value;
-       const next = (obj === "relance14") ? addDaysISO(base, 14) : addDaysISO(base, 7);
-       $("prochaine").value = next;
-     }
-     $("statut").addEventListener("change", autoSuggestNext);
-     $("objectif").addEventListener("change", autoSuggestNext);
-     $("dernier").addEventListener("change", autoSuggestNext);
- 
-     // init
-     refreshUI();
-     generate();
-     autoSuggestNext();
-   </script>
- </body>
- </html>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Générateur + mini CRM (CSV+statuts)</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1250px; margin: 24px auto; padding: 0 16px; }
+    h1 { margin: 0 0 6px; }
+    p { margin: 0 0 14px; color: #444; }
+    .grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 12px; }
+    .card { background:#fafafa; border:1px solid #eee; border-radius:16px; padding:14px; }
+    label { display:block; font-weight:700; margin: 10px 0 6px; }
+    input, select, textarea, button {
+      width:100%; padding:10px; border-radius:10px; border:1px solid #ccc; box-sizing:border-box; font-size:14px;
+    }
+    textarea { min-height:160px; resize: vertical; }
+    button { cursor:pointer; border:none; background:#1f7a5b; color:#fff; font-weight:800; }
+    button.secondary { background:#444; }
+    button.ghost { background:#eaeaea; color:#222; border:1px solid #ddd; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    .small { font-size:12px; color:#666; }
+    .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .row3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#e9f5ef; border:1px solid #cfe8dd; font-size:12px; color:#185a43; }
+    table { width:100%; border-collapse: collapse; margin-top:10px; background:#fff; border-radius:12px; overflow:hidden; }
+    th, td { border-bottom:1px solid #eee; padding:8px; font-size:13px; text-align:left; vertical-align:top; }
+    th { background:#f3f3f3; }
+    tr:hover { background:#fbfbfb; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .inline > * { flex: 1; min-width: 180px; }
+  </style>
+</head>
+<body>
+  <h1>Générateur de messages + mini CRM</h1>
+  <p>
+    <span class="pill">CSV + statuts + relances auto</span> • gratuit • fonctionne partout
+  </p>
+
+  <div class="grid">
+    <!-- LEFT -->
+    <div class="card">
+      <div class="row3">
+        <div>
+          <label for="prenom">Prénom</label>
+          <input id="prenom" placeholder="Ex: Julie" />
+        </div>
+        <div>
+          <label for="plateforme">Plateforme</label>
+          <select id="plateforme">
+            <option>Instagram</option>
+            <option>Facebook</option>
+            <option>TikTok</option>
+            <option>LinkedIn</option>
+            <option>WhatsApp</option>
+          </select>
+        </div>
+        <div>
+          <label for="relation">Relation</label>
+          <select id="relation">
+            <option value="froid">Froid</option>
+            <option value="tiède">Tiède</option>
+            <option value="chaud">Chaud</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row3">
+        <div>
+          <label for="objectif">Objectif</label>
+          <select id="objectif">
+            <option value="discussion">Discussion</option>
+            <option value="question">Question</option>
+            <option value="invitation">Invitation</option>
+            <option value="relance7">Relance J+7</option>
+            <option value="relance14">Relance J+14</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="styleTone">Style</label>
+          <select id="styleTone">
+            <option value="neutre">Neutre</option>
+            <option value="pro">Pro</option>
+            <option value="fun">Fun</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="lengthMode">Longueur</label>
+          <select id="lengthMode">
+            <option value="court">Court</option>
+            <option value="normal" selected>Normal</option>
+            <option value="long">Long</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row3">
+        <div>
+          <label for="persona">Type de personne</label>
+          <select id="persona">
+            <option value="entrepreneur">Entrepreneur / business</option>
+            <option value="parent">Parent / famille</option>
+            <option value="sportif">Sportif / santé</option>
+            <option value="voyage">Voyage / lifestyle</option>
+            <option value="etudiant">Étudiant / début de carrière</option>
+            <option value="createur">Créateur / contenu</option>
+            <option value="job">Salarié / carrière</option>
+            <option value="indefini" selected>Indéfini</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="intention">Intention</label>
+          <select id="intention">
+            <option value="reseau" selected>Réseau / discuter</option>
+            <option value="opportunite">Opportunité (soft)</option>
+            <option value="collab">Collab / projet</option>
+            <option value="curiosite">Curiosité / apprendre</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="statut">Statut</label>
+          <select id="statut">
+            <option value="Nouveau">Nouveau</option>
+            <option value="Répondu">Répondu</option>
+            <option value="À relancer" selected>À relancer</option>
+            <option value="RDV pris">RDV pris</option>
+            <option value="À ne plus contacter">À ne plus contacter</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label for="dernier">Dernier contact</label>
+          <input id="dernier" type="date" />
+          <div class="small">Optionnel : sert au contexte du message.</div>
+        </div>
+        <div>
+          <label for="prochaine">Prochaine relance</label>
+          <input id="prochaine" type="date" />
+          <div class="small">Peut être auto-remplie quand tu “Ajoutes/MAJ”.</div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label for="centre">Centres d’intérêt</label>
+          <input id="centre" placeholder="Ex: sport, voyage..." />
+        </div>
+        <div>
+          <label for="dateCreation">Date création</label>
+          <input id="dateCreation" type="date" disabled />
+          <div class="small">Automatique à la première sauvegarde.</div>
+        </div>
+      </div>
+
+      <label for="accroche">Accroche / contexte</label>
+      <input id="accroche" placeholder="Ex: ta story / ton post..." />
+
+      <label for="note">Note (CRM)</label>
+      <input id="note" placeholder="Ex: aime voyager, relance mardi, etc." />
+
+      <div class="actions">
+        <button id="btnGen">Générer</button>
+        <button class="ghost" id="btnRandom">🎲 Variante</button>
+        <button class="ghost" id="btnCopy">Copier</button>
+        <button class="secondary" id="btnClear">Effacer</button>
+      </div>
+
+      <div class="small" id="daysInfo"></div>
+
+      <label for="result">Message généré</label>
+      <textarea id="result" readonly></textarea>
+
+      <div class="small mono" id="debug" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="card">
+      <div class="inline">
+        <div>
+          <label for="contactSelect">Contacts</label>
+          <select id="contactSelect"></select>
+          <div class="small">Sélectionne → ça remplit le formulaire.</div>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="ghost" id="btnAdd">+ Ajouter/Mettre à jour</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="ghost" id="btnExport">Exporter CSV</button>
+        <button class="ghost" id="btnImportBtn">Importer CSV</button>
+        <input id="importFile" type="file" accept=".csv,text/csv" style="display:none;" />
+        <button class="secondary" id="btnDelete">Supprimer contact</button>
+      </div>
+
+      <div class="small">
+        Colonnes CSV :
+        <span class="mono">prenom,plateforme,relation,objectif,style,longueur,persona,intention,statut,date_creation,dernier,prochaine_relance,centre,accroche,note</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Prénom</th>
+            <th>Plateforme</th>
+            <th>Statut</th>
+            <th>Prochaine relance</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="contactTableBody"></tbody>
+      </table>
+
+      <div class="small" style="margin-top:10px;">
+        Astuce : “À relancer” + Objectif = Relance J+7/J+14 → calcule automatiquement la prochaine relance.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const clean = (s) => (s || "").trim();
+    const STORAGE_KEY = "mlm_contacts_v2";
+
+    // --------- dates helpers ---------
+    function todayISO() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function addDaysISO(baseISO, addDays) {
+      const base = baseISO ? new Date(baseISO + "T00:00:00") : new Date();
+      const d = new Date(base.getTime());
+      d.setDate(d.getDate() + addDays);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function daysSince(dateStr) {
+      if (!dateStr) return null;
+      const d = new Date(dateStr + "T00:00:00");
+      const now = new Date();
+      const ms = now - d;
+      if (isNaN(ms)) return null;
+      return Math.floor(ms / (1000 * 60 * 60 * 24));
+    }
+
+    // --------- message generator (same engine) ---------
+    function tonePacks(style, plateforme, prenom) {
+      const packs = {
+        pro: { hello:[`Bonjour ${prenom},`,`Bonjour ${prenom} 👋`,`Hello ${prenom},`], outro:[`Bonne journée,`,`Au plaisir d’échanger,`,`Bien à vous,`] },
+        neutre: { hello:[`Salut ${prenom} !`,`Hello ${prenom} 👋`,`Coucou ${prenom} !`], outro:[`Bonne journée à toi ✨`,`À bientôt 🙂`,`Force à toi 💪`] },
+        fun: { hello:[`Yo ${prenom} 😄`,`Hey ${prenom} 👋`,`Coucou ${prenom} 😄`], outro:[`Belle journée à toi ✨`,`À très vite 😄`,`Force & good vibes 💪`], funWords:[`la jungle de ${plateforme}`,`le vortex des notifications`,`l’algorithme farceur`] }
+      };
+      return packs[style] || packs.neutre;
+    }
+
+    function personaLine(persona, styleKey) {
+      const map = {
+        entrepreneur:{ pro:`J’aime bien échanger avec des personnes orientées projets.`, neutre:`J’aime bien connecter avec des gens qui construisent des projets.`, fun:`J’aime les gens qui build des trucs 😄` },
+        parent:{ pro:`Échanger avec des personnes qui jonglent avec la vie de famille, c’est toujours intéressant.`, neutre:`Respect à ceux qui gèrent la famille et mille choses.`, fun:`Team multitâches ultime, respect 😄` },
+        sportif:{ pro:`La discipline et les habitudes qui font progresser m’intéressent.`, neutre:`Les vibes sport/santé, j’aime bien.`, fun:`Team progression + bonne humeur 😄` },
+        voyage:{ pro:`Les profils curieux et ouverts, surtout voyage, j’aime bien.`, neutre:`Voyage/lifestyle, ça donne envie de bouger.`, fun:`Ton contenu donne envie de prendre un billet 😄` },
+        etudiant:{ pro:`J’aime bien échanger avec des personnes en phase de construction.`, neutre:`J’aime bien connecter avec des gens qui démarrent.`, fun:`Grosse énergie “je construis mon futur” 😄` },
+        createur:{ pro:`Je respecte beaucoup la constance et la créativité.`, neutre:`On sent la patte chez les créateurs.`, fun:`Créateur = sport de haut niveau 😄` },
+        job:{ pro:`Échanger sur objectifs et évolution pro, je trouve ça intéressant.`, neutre:`J’aime bien parler objectifs et organisation.`, fun:`Team “on progresse sans se cramer” 😄` },
+        indefini:{ pro:`Je suis partant pour un échange simple et humain.`, neutre:`J’aime bien les échanges simples, humains.`, fun:`Je passe pour la vibe, simple 😄` }
+      };
+      const b = map[persona] || map.indefini;
+      return b[styleKey] || b.neutre;
+    }
+
+    function buildMessage(p) {
+      const { prenom, plateforme, relation, objectif, style, lengthMode, persona, intention, accroche, centre, days } = p;
+      const pack = tonePacks(style, plateforme, prenom);
+      const styleKey = (style === "pro" ? "pro" : style === "fun" ? "fun" : "neutre");
+
+      const introByRel = {
+        froid: {
+          pro:[`Je me permets de vous écrire après être tombé sur votre profil sur ${plateforme}.`,`Je découvre votre profil sur ${plateforme} et je souhaitais vous saluer.`],
+          neutre:[`Je te découvre sur ${plateforme} et j’aime bien ton univers.`,`Je viens de voir ton contenu sur ${plateforme} et ça m’a donné envie de te parler.`],
+          fun:[`Je viens de tomber sur ton profil sur ${plateforme} : l’algorithme a bien bossé 😄`,`Je passe par ${plateforme} et je me dis : “ok… vibe intéressante ici.”`]
+        },
+        "tiède": {
+          pro:[`Je reviens vers vous, je me disais que cela valait le coup de reprendre contact.`,`Petit message pour reprendre des nouvelles.`],
+          neutre:[`Je repasse te dire bonjour 🙂`,`Je me suis dit que ça valait le coup de reprendre contact.`],
+          fun:[`Je reviens dans ta DM-zone 😄`,`Je repasse avant que l’algorithme nous sépare 😄`]
+        },
+        chaud: {
+          pro:[`J’espère que vous allez bien. Je me permets de prendre des nouvelles.`,`Bonjour, je passais simplement prendre des nouvelles.`],
+          neutre:[`Hey ${prenom}, j’espère que tu vas bien 😊`,`Yo ${prenom} ! Petite pensée du jour 😄`],
+          fun:[`Yo ${prenom} ! Comment va la légende ? 😄`,`Petit check-up vibe du jour 👀`]
+        }
+      };
+
+      const hook = accroche ? [`J’ai vu ${accroche} — ça m’a fait sourire.`,`Ton ${accroche} m’a intrigué.`] : [`Au fait, quoi de neuf en ce moment ?`,`Tu deviens quoi ces temps-ci ?`];
+      const interest = centre ? [`Tu es toujours à fond sur ${centre} ?`,`Ça avance tes trucs autour de ${centre} ?`] : [`Tu es sur quoi en ce moment ?`,`Qu’est-ce qui t’occupe ces jours-ci ?`];
+
+      const daysLine = (typeof days === "number")
+        ? (days <= 3 ? (styleKey==="pro" ? `Nous avons échangé récemment, je me permets un petit message.` : `On s’est parlé récemment, je repasse vite fait.`)
+           : days <= 10 ? (styleKey==="pro" ? `Je me permets de revenir vers vous après quelques jours.` : `Ça fait quelques jours, je me suis dit que je repassais.`)
+           : (styleKey==="pro" ? `Cela fait un moment, je me permets de reprendre contact.` : `Ça fait un petit moment, je me disais que ça valait le coup.`))
+        : null;
+
+      const invitationSoft = {
+        reseau: { pro:[`Si vous le souhaitez, on peut échanger quelques minutes, simplement pour faire connaissance.`], neutre:[`Si ça te dit, on se cale 10 minutes pour papoter et faire connaissance.`], fun:[`On se cale 10 minutes ? Version papotage propre 😄`] },
+        opportunite: {
+          pro:[`J’ai un sujet qui pourrait vous intéresser. Si vous êtes ouvert, on peut en parler 10 minutes, sans engagement.`,`J’ai une idée/opportunité que je partage parfois à des personnes qui ont votre profil. Si vous êtes curieux, je vous explique.`],
+          neutre:[`J’ai un truc qui pourrait te plaire (rien d’agressif). Si t’es curieux, je t’explique en 10 minutes.`,`J’ai une idée/opportunité que je partage à quelques personnes. Si ça t’intrigue, je peux t’en dire plus.`],
+          fun:[`J’ai un petit truc à te partager. Pas un pitch de robot 😄 Si t’es curieux, 10 minutes et c’est plié.`,`J’ai une idée à te proposer. Si tu dis “pourquoi pas”, je t’explique vite fait 😄`]
+        },
+        collab: { pro:[`Je pensais à une possible collaboration/échange d’idées. Si cela vous intéresse, on peut en parler.`], neutre:[`Je me disais qu’on pourrait échanger sur un projet / une collab possible.`], fun:[`Je sens une vibe “collab” possible 😄 On en parle ?`] },
+        curiosite: { pro:[`Je suis curieux d’en savoir plus sur ce que vous faites en ce moment.`], neutre:[`Je suis curieux : tu construis quoi en ce moment ?`], fun:[`Je suis curieux : tu build quoi en ce moment ? 😄`] }
+      };
+
+      const goal = {
+        discussion: { pro:[`Je voulais simplement vous saluer.`], neutre:[`Je ne voulais pas passer sans te saluer 🙂`], fun:[`Je passais dire bonjour, simple et efficace 😄`] },
+        question:   { pro:[`Petite question : quel est votre focus du moment ?`], neutre:[`Question rapide : ton focus du moment, c’est quoi ?`], fun:[`Question flash ⚡ : ton focus du moment, c’est quoi ?`] },
+        invitation: invitationSoft[intention][styleKey],
+        relance7:   { pro:[`Je me permets une relance, au cas où mon message vous aurait échappé.`], neutre:[`Petite relance 🙂 Tu avais eu le temps de voir mon message ?`], fun:[`Petit ping 🛎️ : l’algorithme a fait le ninja ou tu avais vu ? 😄`] }[styleKey],
+        relance14:  { pro:[`Je reviens une dernière fois : si ce n’est pas le bon moment, aucun souci.`], neutre:[`Dernière relance 🙂 Si ce n’est pas le moment, aucun souci.`], fun:[`Dernier petit ping et après je disparais dans la fumée 🥷💨`] }[styleKey]
+      };
+
+      const intro = pick(introByRel[relation]?.[styleKey] || introByRel.froid.neutre);
+      const personaTxt = personaLine(persona, styleKey);
+      const goalLine = pick(goal[objectif] || goal.discussion.neutre);
+      const outro = pick(pack.outro);
+
+      const lines = [pick(pack.hello), ""];
+      if (lengthMode === "court") {
+        lines.push(intro, personaTxt, "", goalLine, "", outro);
+        return lines.join("\n");
+      }
+      if (lengthMode === "normal") {
+        lines.push(intro);
+        (Math.random() < 0.5) ? lines.push(pick(hook), pick(interest)) : lines.push(pick(interest), pick(hook));
+        lines.push(personaTxt);
+        if (daysLine) lines.push(daysLine);
+        lines.push("", goalLine, "", outro);
+        return lines.join("\n");
+      }
+      const human = { pro:[`Rien d’urgent, c’est surtout pour garder un contact simple.`], neutre:[`Rien d’urgent, c’est juste pour garder le lien.`], fun:[`Promis, pas de script robot ici 🤖❌`] };
+      lines.push(intro, pick(hook), pick(interest), personaTxt);
+      if (daysLine) lines.push(daysLine);
+      lines.push(pick(human[styleKey]), "", goalLine, "", outro);
+      return lines.join("\n");
+    }
+
+    function generate() {
+      const prenom = clean($("prenom").value) || "toi";
+      const plateforme = $("plateforme").value;
+      const relation = $("relation").value;
+      const objectif = $("objectif").value;
+      const style = $("styleTone").value;
+      const lengthMode = $("lengthMode").value;
+      const persona = $("persona").value;
+      const intention = $("intention").value;
+      const accroche = clean($("accroche").value);
+      const centre = clean($("centre").value);
+      const days = daysSince($("dernier").value);
+
+      const msg = buildMessage({ prenom, plateforme, relation, objectif, style, lengthMode, persona, intention, accroche, centre, days });
+      $("result").value = msg;
+
+      $("debug").textContent =
+        `params => prenom:${prenom} | plateforme:${plateforme} | relation:${relation} | objectif:${objectif} | style:${style} | longueur:${lengthMode} | persona:${persona} | intention:${intention}`;
+
+      $("daysInfo").textContent =
+        (typeof days === "number") ? `Dernier contact : il y a ${days} jour(s).` : `Astuce : ajoute une date pour contextualiser.`;
+    }
+
+    // --------- contacts (local) ---------
+    function loadContacts() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+      catch { return []; }
+    }
+    function saveContacts(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+
+    function contactKey(c) {
+      return `${(c.prenom||"").toLowerCase()}__${(c.plateforme||"").toLowerCase()}`;
+    }
+
+    function getFormAsContact() {
+      return {
+        prenom: clean($("prenom").value),
+        plateforme: $("plateforme").value,
+        relation: $("relation").value,
+        objectif: $("objectif").value,
+        style: $("styleTone").value,
+        longueur: $("lengthMode").value,
+        persona: $("persona").value,
+        intention: $("intention").value,
+        statut: $("statut").value,
+        date_creation: $("dateCreation").value || "",
+        dernier: $("dernier").value || "",
+        prochaine_relance: $("prochaine").value || "",
+        centre: clean($("centre").value),
+        accroche: clean($("accroche").value),
+        note: clean($("note").value)
+      };
+    }
+
+    function computeNextFollowUp(c) {
+      // Si statut n'est pas "À relancer", on ne touche pas (sauf si vide et statut À relancer)
+      if (c.statut !== "À relancer") return c.prochaine_relance || "";
+
+      // Base : si dernier contact existe => base=dernier sinon aujourd'hui
+      const base = c.dernier || todayISO();
+
+      // Si objectif relance7/14 => respect
+      if (c.objectif === "relance14") return addDaysISO(base, 14);
+      return addDaysISO(base, 7); // défaut relance7
+    }
+
+    function fillFormFromContact(c) {
+      $("prenom").value = c.prenom || "";
+      $("plateforme").value = c.plateforme || "Instagram";
+      $("relation").value = c.relation || "froid";
+      $("objectif").value = c.objectif || "discussion";
+      $("styleTone").value = c.style || "neutre";
+      $("lengthMode").value = c.longueur || "normal";
+      $("persona").value = c.persona || "indefini";
+      $("intention").value = c.intention || "reseau";
+      $("statut").value = c.statut || "Nouveau";
+      $("dateCreation").value = c.date_creation || "";
+      $("dernier").value = c.dernier || "";
+      $("prochaine").value = c.prochaine_relance || "";
+      $("centre").value = c.centre || "";
+      $("accroche").value = c.accroche || "";
+      $("note").value = c.note || "";
+      generate();
+    }
+
+    function refreshUI() {
+      const contacts = loadContacts();
+      const sel = $("contactSelect");
+      sel.innerHTML = "";
+      const o0 = document.createElement("option");
+      o0.value = ""; o0.textContent = "— sélectionner —";
+      sel.appendChild(o0);
+
+      contacts.slice().sort((a,b)=> (a.prenom||"").localeCompare(b.prenom||"")).forEach((c, idx) => {
+        const o = document.createElement("option");
+        o.value = String(idx);
+        o.textContent = `${c.prenom || "(sans prénom)"} • ${c.plateforme || ""}`;
+        sel.appendChild(o);
+      });
+
+      const tbody = $("contactTableBody");
+      tbody.innerHTML = "";
+      contacts.forEach((c, idx) => {
+        const tr = document.createElement("tr");
+        tr.style.cursor = "pointer";
+        tr.title = "Clique pour charger ce contact";
+        tr.addEventListener("click", () => {
+          $("contactSelect").value = String(idx);
+          fillFormFromContact(c);
+        });
+
+        const td1 = document.createElement("td"); td1.textContent = c.prenom || "";
+        const td2 = document.createElement("td"); td2.textContent = c.plateforme || "";
+        const td3 = document.createElement("td"); td3.textContent = c.statut || "";
+        const td4 = document.createElement("td"); td4.textContent = c.prochaine_relance || "";
+        const td5 = document.createElement("td"); td5.textContent = c.note || "";
+        tr.append(td1, td2, td3, td4, td5);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addOrUpdateContact() {
+      const c = getFormAsContact();
+      if (!c.prenom) { alert("Ajoute au moins un prénom pour enregistrer 🙂"); return; }
+
+      const contacts = loadContacts();
+      const key = contactKey(c);
+      const i = contacts.findIndex(x => contactKey(x) === key);
+
+      // Date création auto si nouveau
+      if (i < 0 && !c.date_creation) c.date_creation = todayISO();
+
+      // Prochaine relance auto si statut "À relancer" et champ vide OU si tu veux recalculer : on recalc si statut À relancer
+      c.prochaine_relance = computeNextFollowUp(c);
+
+      // Met à jour l'affichage du champ dateCreation + prochaine
+      $("dateCreation").value = c.date_creation;
+      $("prochaine").value = c.prochaine_relance;
+
+      if (i >= 0) contacts[i] = c; else contacts.push(c);
+      saveContacts(contacts);
+      refreshUI();
+    }
+
+    function deleteSelectedContact() {
+      const idx = $("contactSelect").value;
+      if (idx === "") return;
+      const contacts = loadContacts();
+      const i = Number(idx);
+      if (Number.isNaN(i) || i < 0 || i >= contacts.length) return;
+      const name = contacts[i]?.prenom || "ce contact";
+      if (!confirm(`Supprimer ${name} ?`)) return;
+      contacts.splice(i, 1);
+      saveContacts(contacts);
+      refreshUI();
+    }
+
+    // --------- CSV ---------
+    const CSV_HEADERS = ["prenom","plateforme","relation","objectif","style","longueur","persona","intention","statut","date_creation","dernier","prochaine_relance","centre","accroche","note"];
+
+    function escapeCSV(value) {
+      const s = String(value ?? "");
+      if (/[",\n\r;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    }
+
+    function toCSVRow(obj) {
+      return CSV_HEADERS.map(h => escapeCSV(obj[h] ?? "")).join(",");
+    }
+
+    function exportCSV() {
+      const contacts = loadContacts();
+      const lines = [CSV_HEADERS.join(",")];
+      contacts.forEach(c => lines.push(toCSVRow(c)));
+      const csv = lines.join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "contacts_mlm.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function parseCSV(text) {
+      const rows = [];
+      let i = 0, field = "", row = [], inQuotes = false;
+      while (i < text.length) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"') {
+            const next = text[i+1];
+            if (next === '"') { field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += ch; i++; continue;
+        } else {
+          if (ch === '"') { inQuotes = true; i++; continue; }
+          if (ch === ',') { row.push(field); field=""; i++; continue; }
+          if (ch === '\n') { row.push(field); rows.push(row); row=[]; field=""; i++; continue; }
+          if (ch === '\r') { i++; continue; }
+          field += ch; i++; continue;
+        }
+      }
+      row.push(field); rows.push(row);
+      return rows;
+    }
+
+    function importCSVFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || "");
+        const rows = parseCSV(text);
+        if (rows.length < 1) { alert("CSV vide."); return; }
+
+        const headers = rows[0].map(h => h.trim());
+        const map = {};
+        headers.forEach((h, idx) => map[h] = idx);
+
+        if (map["prenom"] == null) { alert("CSV invalide : colonne 'prenom' introuvable."); return; }
+
+        const imported = [];
+        for (let r = 1; r < rows.length; r++) {
+          const line = rows[r];
+          if (line.length === 1 && !line[0]) continue;
+
+          const obj = {};
+          CSV_HEADERS.forEach(h => {
+            const idx = map[h];
+            obj[h] = (idx != null && idx < line.length) ? (line[idx] || "") : "";
+          });
+
+          // defaults
+          if (!obj.plateforme) obj.plateforme = "Instagram";
+          if (!obj.relation) obj.relation = "froid";
+          if (!obj.objectif) obj.objectif = "discussion";
+          if (!obj.style) obj.style = "neutre";
+          if (!obj.longueur) obj.longueur = "normal";
+          if (!obj.persona) obj.persona = "indefini";
+          if (!obj.intention) obj.intention = "reseau";
+          if (!obj.statut) obj.statut = "Nouveau";
+          if (!obj.date_creation) obj.date_creation = todayISO();
+
+          // if status is À relancer and next is empty => compute
+          if (obj.statut === "À relancer" && !obj.prochaine_relance) {
+            obj.prochaine_relance = computeNextFollowUp(obj);
+          }
+
+          if (clean(obj.prenom)) imported.push(obj);
+        }
+
+        const contacts = loadContacts();
+        imported.forEach(c => {
+          const key = contactKey(c);
+          const i = contacts.findIndex(x => contactKey(x) === key);
+          if (i >= 0) contacts[i] = c; else contacts.push(c);
+        });
+
+        saveContacts(contacts);
+        refreshUI();
+        alert(`Import terminé ✅ (${imported.length} contact(s))`);
+      };
+      reader.readAsText(file, "utf-8");
+    }
+
+    // --------- events ---------
+    $("btnGen").addEventListener("click", generate);
+    $("btnRandom").addEventListener("click", generate);
+
+    $("btnCopy").addEventListener("click", async () => {
+      const text = $("result").value;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        $("btnCopy").textContent = "Copié ✅";
+        setTimeout(() => $("btnCopy").textContent = "Copier", 900);
+      } catch {
+        alert("Copie impossible. Sélectionne le texte et fais Ctrl+C.");
+      }
+    });
+
+    $("btnClear").addEventListener("click", () => {
+      ["prenom","centre","accroche","note","dernier","prochaine"].forEach(id => $(id).value = "");
+      $("dateCreation").value = "";
+      $("plateforme").value = "Instagram";
+      $("relation").value = "froid";
+      $("objectif").value = "discussion";
+      $("styleTone").value = "neutre";
+      $("lengthMode").value = "normal";
+      $("persona").value = "indefini";
+      $("intention").value = "reseau";
+      $("statut").value = "À relancer";
+      $("result").value = "";
+      $("debug").textContent = "";
+      $("daysInfo").textContent = "";
+      generate();
+    });
+
+    $("btnAdd").addEventListener("click", addOrUpdateContact);
+    $("btnDelete").addEventListener("click", deleteSelectedContact);
+
+    $("contactSelect").addEventListener("change", () => {
+      const idx = $("contactSelect").value;
+      if (idx === "") return;
+      const contacts = loadContacts();
+      const i = Number(idx);
+      if (Number.isNaN(i) || i < 0 || i >= contacts.length) return;
+      fillFormFromContact(contacts[i]);
+    });
+
+    $("btnExport").addEventListener("click", exportCSV);
+    $("btnImportBtn").addEventListener("click", () => $("importFile").click());
+    $("importFile").addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      importCSVFile(file);
+      e.target.value = "";
+    });
+
+    // Auto recalcul si tu changes (statut/objectif/dernier)
+    function autoSuggestNext() {
+      const statut = $("statut").value;
+      if (statut !== "À relancer") return;
+      const base = $("dernier").value || todayISO();
+      const obj = $("objectif").value;
+      const next = (obj === "relance14") ? addDaysISO(base, 14) : addDaysISO(base, 7);
+      $("prochaine").value = next;
+    }
+    $("statut").addEventListener("change", autoSuggestNext);
+    $("objectif").addEventListener("change", autoSuggestNext);
+    $("dernier").addEventListener("change", autoSuggestNext);
+
+    // init
+    refreshUI();
+    generate();
+    autoSuggestNext();
+  </script>
+</body>
+</html>
