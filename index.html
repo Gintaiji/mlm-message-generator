@@ -196,6 +196,12 @@
       </div>
 
       <div class="actions">
+        <button class="ghost" id="btnMarkReplied">Marquer comme Répondu</button>
+        <button class="ghost" id="btnPlan7">Planifier relance J+7</button>
+        <button class="ghost" id="btnPlan14">Planifier relance J+14</button>
+      </div>
+
+      <div class="actions">
         <button class="ghost" id="btnExport">Exporter CSV</button>
         <button class="ghost" id="btnImportBtn">Importer CSV</button>
         <input id="importFile" type="file" accept=".csv,text/csv" style="display:none;" />
@@ -206,6 +212,24 @@
         Colonnes CSV :
         <span class="mono">prenom,plateforme,relation,objectif,style,longueur,persona,intention,statut,date_creation,dernier,prochaine_relance,centre,accroche,note</span>
       </div>
+
+      <div class="row2">
+        <div>
+          <label for="filterSelect">Filtre</label>
+          <select id="filterSelect">
+            <option value="all">Tous</option>
+            <option value="urgent">Urgent</option>
+            <option value="relance">À relancer</option>
+            <option value="rdv">RDV pris</option>
+          </select>
+        </div>
+        <div>
+          <label for="searchInput">Recherche</label>
+          <input id="searchInput" placeholder="Prénom ou note..." />
+        </div>
+      </div>
+
+      <div class="small" id="relanceCount" style="margin-top:8px;"></div>
 
       <table>
         <thead>
@@ -242,6 +266,21 @@
       return `${y}-${m}-${day}`;
     }
 
+    function parseISODate(iso) {
+      if (!iso) return null;
+      const d = new Date(`${iso}T00:00:00`);
+      if (Number.isNaN(d.getTime())) return null;
+      return d;
+    }
+
+    function daysDiff(aISO, bISO) {
+      const a = parseISODate(aISO);
+      const b = parseISODate(bISO);
+      if (!a || !b) return null;
+      const diffMs = b.getTime() - a.getTime();
+      return Math.round(diffMs / (1000 * 60 * 60 * 24));
+    }
+
     function addDaysISO(baseISO, addDays) {
       const base = baseISO ? new Date(baseISO + "T00:00:00") : new Date();
       const d = new Date(base.getTime());
@@ -259,6 +298,14 @@
       const ms = now - d;
       if (isNaN(ms)) return null;
       return Math.floor(ms / (1000 * 60 * 60 * 24));
+    }
+
+    function formatFollowUpSuffix(dateISO) {
+      const diff = daysDiff(todayISO(), dateISO);
+      if (diff == null) return "";
+      if (diff === 0) return " (J+0)";
+      if (diff > 0) return ` (J-${diff})`;
+      return ` (J+${Math.abs(diff)})`;
     }
 
     // --------- message generator (same engine) ---------
@@ -392,8 +439,20 @@
     }
     function saveContacts(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
 
+    function normalizeKeyPart(value) {
+      return clean(value)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "");
+    }
+
     function contactKey(c) {
-      return `${(c.prenom||"").toLowerCase()}__${(c.plateforme||"").toLowerCase()}`;
+      return `${normalizeKeyPart(c.prenom)}__${normalizeKeyPart(c.plateforme)}`;
+    }
+
+    function getContactByKey(list, key) {
+      return list.find((c) => contactKey(c) === key);
     }
 
     function getFormAsContact() {
@@ -446,9 +505,28 @@
       generate();
     }
 
+    function isUrgent(c, today) {
+      return c.statut === "À relancer" && c.prochaine_relance && c.prochaine_relance <= today;
+    }
+
+    function matchesFilter(c, filterValue, today) {
+      if (filterValue === "urgent") return isUrgent(c, today);
+      if (filterValue === "relance") return c.statut === "À relancer";
+      if (filterValue === "rdv") return c.statut === "RDV pris";
+      return true;
+    }
+
+    function matchesSearch(c, query) {
+      if (!query) return true;
+      const haystack = `${c.prenom || ""} ${c.note || ""} ${c.plateforme || ""}`.toLowerCase();
+      return haystack.includes(query);
+    }
+
     function refreshUI() {
       const contacts = loadContacts();
       const today = todayISO();
+      const filterValue = $("filterSelect").value;
+      const searchValue = clean($("searchInput").value).toLowerCase();
 
       const sel = $("contactSelect");
       sel.innerHTML = "";
@@ -466,9 +544,19 @@
           sel.appendChild(o);
         });
 
-      if (selectedKey) sel.value = selectedKey;
+      if (selectedKey && getContactByKey(contacts, selectedKey)) {
+        sel.value = selectedKey;
+      } else {
+        selectedKey = "";
+        sel.value = "";
+      }
+
+      const relanceCount = contacts.filter((c) => isUrgent(c, today)).length;
+      $("relanceCount").textContent = `Relances du jour : ${relanceCount}`;
 
       const contactsForDisplay = contacts
+        .filter((c) => matchesFilter(c, filterValue, today))
+        .filter((c) => matchesSearch(c, searchValue))
         .slice()
         .sort((a, b) => {
           const da = a.prochaine_relance || "";
@@ -497,14 +585,16 @@
 
         const td3 = document.createElement("td");
         td3.textContent = c.statut || "";
-        if (c.statut === "À relancer" && c.prochaine_relance && c.prochaine_relance <= today) {
+        if (isUrgent(c, today)) {
           const badge = document.createElement("span");
           badge.className = "badge-urgent";
           badge.textContent = "URGENT";
           td3.append(" ", badge);
         }
 
-        const td4 = document.createElement("td"); td4.textContent = c.prochaine_relance || "";
+        const td4 = document.createElement("td");
+        td4.textContent = c.prochaine_relance ? `${c.prochaine_relance}${formatFollowUpSuffix(c.prochaine_relance)}` : "";
+
         const td5 = document.createElement("td"); td5.textContent = c.note || "";
 
         tr.append(td1, td2, td3, td4, td5);
@@ -534,7 +624,7 @@
     }
 
     function deleteSelectedContact() {
-      const key = $("contactSelect").value;
+      const key = $("contactSelect").value || selectedKey;
       if (!key) return;
 
       const contacts = loadContacts();
@@ -549,6 +639,38 @@
 
       if (selectedKey === key) selectedKey = "";
       refreshUI();
+    }
+
+    function updateSelectedContact(updateFn) {
+      const key = $("contactSelect").value || selectedKey;
+      if (!key) { alert("Sélectionne un contact d’abord."); return; }
+      const contacts = loadContacts();
+      const i = contacts.findIndex((c) => contactKey(c) === key);
+      if (i < 0) return;
+
+      const updated = { ...contacts[i] };
+      updateFn(updated);
+      contacts[i] = updated;
+      saveContacts(contacts);
+      selectedKey = key;
+      refreshUI();
+    }
+
+    function markAsReplied() {
+      updateSelectedContact((c) => {
+        c.statut = "Répondu";
+        c.dernier = todayISO();
+        c.prochaine_relance = "";
+      });
+    }
+
+    function planFollowUp(days, objectif) {
+      updateSelectedContact((c) => {
+        c.statut = "À relancer";
+        c.objectif = objectif;
+        if (!c.dernier) c.dernier = todayISO();
+        c.prochaine_relance = addDaysISO(todayISO(), days);
+      });
     }
 
     // --------- CSV ---------
@@ -698,15 +820,21 @@
 
     $("btnAdd").addEventListener("click", addOrUpdateContact);
     $("btnDelete").addEventListener("click", deleteSelectedContact);
+    $("btnMarkReplied").addEventListener("click", markAsReplied);
+    $("btnPlan7").addEventListener("click", () => planFollowUp(7, "relance7"));
+    $("btnPlan14").addEventListener("click", () => planFollowUp(14, "relance14"));
 
     $("contactSelect").addEventListener("change", () => {
       const contacts = loadContacts();
       selectedKey = $("contactSelect").value;
       if (!selectedKey) return;
-      const found = contacts.find((c) => contactKey(c) === selectedKey);
+      const found = getContactByKey(contacts, selectedKey);
       if (!found) return;
       fillFormFromContact(found);
     });
+
+    $("filterSelect").addEventListener("change", refreshUI);
+    $("searchInput").addEventListener("input", refreshUI);
 
     $("btnExport").addEventListener("click", exportCSV);
     $("btnImportBtn").addEventListener("click", () => $("importFile").click());
