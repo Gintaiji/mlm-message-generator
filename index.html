@@ -31,6 +31,7 @@
     .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .inline > * { flex: 1; min-width: 180px; }
     .badge-urgent { display:inline-block; padding:2px 8px; border-radius:999px; background:#ffe1e1; color:#8b1d1d; border:1px solid #f1bcbc; font-size:11px; font-weight:700; }
+    .contact-info { font-size:12px; color:#555; line-height:1.3; }
   </style>
 </head>
 <body>
@@ -58,8 +59,8 @@
           </select>
         </div>
         <div>
-          <label for="relation">Relation</label>
-          <select id="relation">
+          <label for="marche">Marché</label>
+          <select id="marche">
             <option value="froid">Froid</option>
             <option value="tiède">Tiède</option>
             <option value="chaud">Chaud</option>
@@ -69,7 +70,31 @@
 
       <div class="row3">
         <div>
-          <label for="objectif">Objectif</label>
+          <label for="relationType">Relation</label>
+          <select id="relationType">
+            <option value="prospect" selected>Prospect</option>
+            <option value="client">Client</option>
+            <option value="nouvelle rencontre">Nouvelle rencontre</option>
+            <option value="partenariat">Partenariat</option>
+            <option value="ami">Ami</option>
+            <option value="famille">Famille</option>
+            <option value="collègues">Collègues</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+        <div>
+          <label for="telephone">Téléphone</label>
+          <input id="telephone" type="tel" placeholder="Ex: 06 12 34 56 78" />
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="Ex: julie@mail.com" />
+        </div>
+      </div>
+
+      <div class="row3">
+        <div>
+          <label for="objectif">Sujet</label>
           <select id="objectif">
             <option value="discussion">Discussion</option>
             <option value="question">Question</option>
@@ -210,7 +235,7 @@
 
       <div class="small">
         Colonnes CSV :
-        <span class="mono">prenom,plateforme,relation,objectif,style,longueur,persona,intention,statut,date_creation,dernier,prochaine_relance,centre,accroche,note</span>
+        <span class="mono">prenom,plateforme,marche,relation_type,telephone,email,objectif,style,longueur,persona,intention,statut,date_creation,dernier,prochaine_relance,centre,accroche,note</span>
       </div>
 
       <div class="row2">
@@ -221,11 +246,14 @@
             <option value="urgent">Urgent</option>
             <option value="relance">À relancer</option>
             <option value="rdv">RDV pris</option>
+            <option value="prospect">Prospects</option>
+            <option value="client">Clients</option>
+            <option value="partenariat">Partenariats</option>
           </select>
         </div>
         <div>
           <label for="searchInput">Recherche</label>
-          <input id="searchInput" placeholder="Prénom ou note..." />
+          <input id="searchInput" placeholder="Prénom, note, tel ou email..." />
         </div>
       </div>
 
@@ -238,6 +266,7 @@
             <th>Plateforme</th>
             <th>Statut</th>
             <th>Prochaine relance</th>
+            <th>Contact</th>
             <th>Note</th>
           </tr>
         </thead>
@@ -245,7 +274,7 @@
       </table>
 
       <div class="small" style="margin-top:10px;">
-        Astuce : “À relancer” + Objectif = Relance J+7/J+14 → calcule automatiquement la prochaine relance.
+        Astuce : “À relancer” + Sujet = Relance J+7/J+14 → calcule automatiquement la prochaine relance.
       </div>
     </div>
   </div>
@@ -334,7 +363,7 @@
     }
 
     function buildMessage(p) {
-      const { prenom, plateforme, relation, objectif, style, lengthMode, persona, intention, accroche, centre, days } = p;
+      const { prenom, plateforme, marche, objectif, style, lengthMode, persona, intention, accroche, centre, days } = p;
       const pack = tonePacks(style, plateforme, prenom);
       const styleKey = (style === "pro" ? "pro" : style === "fun" ? "fun" : "neutre");
 
@@ -384,7 +413,7 @@
         relance14:  { pro:[`Je reviens une dernière fois : si ce n’est pas le bon moment, aucun souci.`], neutre:[`Dernière relance 🙂 Si ce n’est pas le moment, aucun souci.`], fun:[`Dernier petit ping et après je disparais dans la fumée 🥷💨`] }[styleKey]
       };
 
-      const intro = pick(introByRel[relation]?.[styleKey] || introByRel.froid.neutre);
+      const intro = pick(introByRel[marche]?.[styleKey] || introByRel.froid.neutre);
       const personaTxt = personaLine(persona, styleKey);
       const goalLine = pick(goal[objectif] || goal.discussion.neutre);
       const outro = pick(pack.outro);
@@ -412,7 +441,7 @@
     function generate() {
       const prenom = clean($("prenom").value) || "toi";
       const plateforme = $("plateforme").value;
-      const relation = $("relation").value;
+      const marche = $("marche").value;
       const objectif = $("objectif").value;
       const style = $("styleTone").value;
       const lengthMode = $("lengthMode").value;
@@ -422,20 +451,42 @@
       const centre = clean($("centre").value);
       const days = daysSince($("dernier").value);
 
-      const msg = buildMessage({ prenom, plateforme, relation, objectif, style, lengthMode, persona, intention, accroche, centre, days });
+      const msg = buildMessage({ prenom, plateforme, marche, objectif, style, lengthMode, persona, intention, accroche, centre, days });
       $("result").value = msg;
 
       $("debug").textContent =
-        `params => prenom:${prenom} | plateforme:${plateforme} | relation:${relation} | objectif:${objectif} | style:${style} | longueur:${lengthMode} | persona:${persona} | intention:${intention}`;
+        `params => prenom:${prenom} | plateforme:${plateforme} | marche:${marche} | sujet:${objectif} | style:${style} | longueur:${lengthMode} | persona:${persona} | intention:${intention}`;
 
       $("daysInfo").textContent =
         (typeof days === "number") ? `Dernier contact : il y a ${days} jour(s).` : `Astuce : ajoute une date pour contextualiser.`;
     }
 
     // --------- contacts (local) ---------
+    function migrateContact(contact) {
+      const migrated = { ...contact };
+      if (!migrated.marche && migrated.relation) migrated.marche = migrated.relation;
+      if (!migrated.relation_type) migrated.relation_type = "prospect";
+      if (!migrated.telephone) migrated.telephone = "";
+      if (!migrated.email) migrated.email = "";
+      return migrated;
+    }
+
     function loadContacts() {
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
-      catch { return []; }
+      try {
+        const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        let changed = false;
+        const migrated = raw.map((c) => {
+          const next = migrateContact(c);
+          if (next.marche !== c.marche || next.relation_type !== c.relation_type || next.telephone !== c.telephone || next.email !== c.email) {
+            changed = true;
+          }
+          return next;
+        });
+        if (changed) saveContacts(migrated);
+        return migrated;
+      } catch {
+        return [];
+      }
     }
     function saveContacts(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
 
@@ -459,7 +510,10 @@
       return {
         prenom: clean($("prenom").value),
         plateforme: $("plateforme").value,
-        relation: $("relation").value,
+        marche: $("marche").value,
+        relation_type: $("relationType").value,
+        telephone: clean($("telephone").value),
+        email: clean($("email").value),
         objectif: $("objectif").value,
         style: $("styleTone").value,
         longueur: $("lengthMode").value,
@@ -489,7 +543,10 @@
 
       $("prenom").value = c.prenom || "";
       $("plateforme").value = c.plateforme || "Instagram";
-      $("relation").value = c.relation || "froid";
+      $("marche").value = c.marche || c.relation || "froid";
+      $("relationType").value = c.relation_type || "prospect";
+      $("telephone").value = c.telephone || "";
+      $("email").value = c.email || "";
       $("objectif").value = c.objectif || "discussion";
       $("styleTone").value = c.style || "neutre";
       $("lengthMode").value = c.longueur || "normal";
@@ -513,12 +570,15 @@
       if (filterValue === "urgent") return isUrgent(c, today);
       if (filterValue === "relance") return c.statut === "À relancer";
       if (filterValue === "rdv") return c.statut === "RDV pris";
+      if (["prospect", "client", "partenariat"].includes(filterValue)) {
+        return (c.relation_type || "prospect") === filterValue;
+      }
       return true;
     }
 
     function matchesSearch(c, query) {
       if (!query) return true;
-      const haystack = `${c.prenom || ""} ${c.note || ""} ${c.plateforme || ""}`.toLowerCase();
+      const haystack = `${c.prenom || ""} ${c.note || ""} ${c.plateforme || ""} ${c.telephone || ""} ${c.email || ""}`.toLowerCase();
       return haystack.includes(query);
     }
 
@@ -595,9 +655,18 @@
         const td4 = document.createElement("td");
         td4.textContent = c.prochaine_relance ? `${c.prochaine_relance}${formatFollowUpSuffix(c.prochaine_relance)}` : "";
 
-        const td5 = document.createElement("td"); td5.textContent = c.note || "";
+        const td5 = document.createElement("td");
+        const info = [c.telephone, c.email].filter(Boolean).join("\n");
+        if (info) {
+          const infoEl = document.createElement("div");
+          infoEl.className = "contact-info";
+          infoEl.textContent = info;
+          td5.appendChild(infoEl);
+        }
 
-        tr.append(td1, td2, td3, td4, td5);
+        const td6 = document.createElement("td"); td6.textContent = c.note || "";
+
+        tr.append(td1, td2, td3, td4, td5, td6);
         tbody.appendChild(tr);
       });
     }
@@ -674,7 +743,7 @@
     }
 
     // --------- CSV ---------
-    const CSV_HEADERS = ["prenom","plateforme","relation","objectif","style","longueur","persona","intention","statut","date_creation","dernier","prochaine_relance","centre","accroche","note"];
+    const CSV_HEADERS = ["prenom","plateforme","marche","relation_type","telephone","email","objectif","style","longueur","persona","intention","statut","date_creation","dernier","prochaine_relance","centre","accroche","note"];
 
     function escapeCSV(value) {
       const s = String(value ?? "");
@@ -748,12 +817,20 @@
 
           const obj = {};
           CSV_HEADERS.forEach(h => {
+            if (h === "marche") {
+              const idx = map["marche"] != null ? map["marche"] : map["relation"];
+              obj[h] = (idx != null && idx < line.length) ? (line[idx] || "") : "";
+              return;
+            }
             const idx = map[h];
             obj[h] = (idx != null && idx < line.length) ? (line[idx] || "") : "";
           });
 
+          if (!obj.relation_type) obj.relation_type = "prospect";
+          if (!obj.telephone) obj.telephone = "";
+          if (!obj.email) obj.email = "";
           if (!obj.plateforme) obj.plateforme = "Instagram";
-          if (!obj.relation) obj.relation = "froid";
+          if (!obj.marche) obj.marche = "froid";
           if (!obj.objectif) obj.objectif = "discussion";
           if (!obj.style) obj.style = "neutre";
           if (!obj.longueur) obj.longueur = "normal";
@@ -800,10 +877,11 @@
     });
 
     $("btnClear").addEventListener("click", () => {
-      ["prenom","centre","accroche","note","dernier","prochaine"].forEach(id => $(id).value = "");
+      ["prenom","centre","accroche","note","dernier","prochaine","telephone","email"].forEach(id => $(id).value = "");
       $("dateCreation").value = "";
       $("plateforme").value = "Instagram";
-      $("relation").value = "froid";
+      $("marche").value = "froid";
+      $("relationType").value = "prospect";
       $("objectif").value = "discussion";
       $("styleTone").value = "neutre";
       $("lengthMode").value = "normal";
@@ -863,5 +941,13 @@
     generate();
     autoSuggestNext();
   </script>
+
+  <!--
+    Tests manuels :
+    1) Ancien localStorage existant → tout s’affiche et “Relation” est migrée vers “Marché”.
+    2) Import ancien CSV → mapping relation → marche OK.
+    3) Export puis re-import nouveau CSV → données identiques.
+    4) Création d’un contact avec tel/email → sauvegarde OK.
+  -->
 </body>
 </html>
