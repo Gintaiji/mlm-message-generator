@@ -31,6 +31,7 @@
     .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .inline > * { flex: 1; min-width: 180px; }
     .badge-urgent { display:inline-block; padding:2px 8px; border-radius:999px; background:#ffe1e1; color:#8b1d1d; border:1px solid #f1bcbc; font-size:11px; font-weight:700; }
+    .contact-info { white-space: pre-line; }
   </style>
 </head>
 <body>
@@ -58,8 +59,8 @@
           </select>
         </div>
         <div>
-          <label for="relation">Relation</label>
-          <select id="relation">
+          <label for="marche">Marché</label>
+          <select id="marche">
             <option value="froid">Froid</option>
             <option value="tiède">Tiède</option>
             <option value="chaud">Chaud</option>
@@ -69,13 +70,27 @@
 
       <div class="row3">
         <div>
-          <label for="objectif">Objectif</label>
+          <label for="objectif">Sujet</label>
           <select id="objectif">
             <option value="discussion">Discussion</option>
             <option value="question">Question</option>
             <option value="invitation">Invitation</option>
             <option value="relance7">Relance J+7</option>
             <option value="relance14">Relance J+14</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="relation_type">Type de relation</label>
+          <select id="relation_type">
+            <option value="prospect">Prospect</option>
+            <option value="client">Client</option>
+            <option value="nouvelle rencontre">Nouvelle rencontre</option>
+            <option value="partenariat">Partenariat</option>
+            <option value="ami">Ami</option>
+            <option value="famille">Famille</option>
+            <option value="collègues">Collègues</option>
+            <option value="autre">Autre</option>
           </select>
         </div>
 
@@ -166,6 +181,17 @@
       <label for="note">Note (CRM)</label>
       <input id="note" placeholder="Ex: aime voyager, relance mardi, etc." />
 
+      <div class="row2">
+        <div>
+          <label for="telephone">Téléphone</label>
+          <input id="telephone" placeholder="Ex: +33 6 12 34 56 78" />
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="Ex: contact@email.com" />
+        </div>
+      </div>
+
       <div class="actions">
         <button id="btnGen">Générer</button>
         <button class="ghost" id="btnRandom">🎲 Variante</button>
@@ -202,6 +228,13 @@
       </div>
 
       <div class="actions">
+        <button class="ghost" id="btnCopyPhone" disabled>Copier tel</button>
+        <button class="ghost" id="btnCopyEmail" disabled>Copier email</button>
+      </div>
+
+      <div class="small contact-info" id="contactInfo"></div>
+
+      <div class="actions">
         <button class="ghost" id="btnExport">Exporter CSV</button>
         <button class="ghost" id="btnImportBtn">Importer CSV</button>
         <input id="importFile" type="file" accept=".csv,text/csv" style="display:none;" />
@@ -210,7 +243,7 @@
 
       <div class="small">
         Colonnes CSV :
-        <span class="mono">prenom,plateforme,relation,objectif,style,longueur,persona,intention,statut,date_creation,dernier,prochaine_relance,centre,accroche,note</span>
+        <span class="mono">prenom,plateforme,marche,relation_type,telephone,email,objectif,style,longueur,persona,intention,statut,date_creation,dernier,prochaine_relance,centre,accroche,note</span>
       </div>
 
       <div class="row2">
@@ -256,6 +289,41 @@
     const clean = (s) => (s || "").trim();
     const STORAGE_KEY = "mlm_contacts_v2";
     let selectedKey = "";
+    const eventBindings = new WeakMap();
+
+    function addListenerOnce(id, eventName, handler) {
+      const el = $(id);
+      if (!el) return;
+      const signature = `${eventName}:${handler.name || "anonymous"}`;
+      const registered = eventBindings.get(el) || new Set();
+      if (registered.has(signature)) return;
+      el.addEventListener(eventName, handler);
+      registered.add(signature);
+      eventBindings.set(el, registered);
+    }
+
+    function warnDuplicateIds() {
+      const idMap = new Map();
+      document.querySelectorAll("[id]").forEach((el) => {
+        const id = el.id;
+        idMap.set(id, (idMap.get(id) || 0) + 1);
+      });
+      idMap.forEach((count, id) => {
+        if (count > 1) console.warn(`ID dupliqué détecté: #${id} (${count} occurrences)`);
+      });
+    }
+
+    function normalizePhone(value) {
+      return clean(value).replace(/\s+/g, " ");
+    }
+
+    function normalizeEmail(value) {
+      return clean(value).toLowerCase();
+    }
+
+    function isValidEmail(value) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
 
     // --------- dates helpers ---------
     function todayISO() {
@@ -334,7 +402,7 @@
     }
 
     function buildMessage(p) {
-      const { prenom, plateforme, relation, objectif, style, lengthMode, persona, intention, accroche, centre, days } = p;
+      const { prenom, plateforme, marche, objectif, style, lengthMode, persona, intention, accroche, centre, days } = p;
       const pack = tonePacks(style, plateforme, prenom);
       const styleKey = (style === "pro" ? "pro" : style === "fun" ? "fun" : "neutre");
 
@@ -384,7 +452,7 @@
         relance14:  { pro:[`Je reviens une dernière fois : si ce n’est pas le bon moment, aucun souci.`], neutre:[`Dernière relance 🙂 Si ce n’est pas le moment, aucun souci.`], fun:[`Dernier petit ping et après je disparais dans la fumée 🥷💨`] }[styleKey]
       };
 
-      const intro = pick(introByRel[relation]?.[styleKey] || introByRel.froid.neutre);
+      const intro = pick(introByRel[marche]?.[styleKey] || introByRel.froid.neutre);
       const personaTxt = personaLine(persona, styleKey);
       const goalLine = pick(goal[objectif] || goal.discussion.neutre);
       const outro = pick(pack.outro);
@@ -412,7 +480,7 @@
     function generate() {
       const prenom = clean($("prenom").value) || "toi";
       const plateforme = $("plateforme").value;
-      const relation = $("relation").value;
+      const marche = $("marche").value;
       const objectif = $("objectif").value;
       const style = $("styleTone").value;
       const lengthMode = $("lengthMode").value;
@@ -422,19 +490,32 @@
       const centre = clean($("centre").value);
       const days = daysSince($("dernier").value);
 
-      const msg = buildMessage({ prenom, plateforme, relation, objectif, style, lengthMode, persona, intention, accroche, centre, days });
+      const msg = buildMessage({ prenom, plateforme, marche, objectif, style, lengthMode, persona, intention, accroche, centre, days });
       $("result").value = msg;
 
       $("debug").textContent =
-        `params => prenom:${prenom} | plateforme:${plateforme} | relation:${relation} | objectif:${objectif} | style:${style} | longueur:${lengthMode} | persona:${persona} | intention:${intention}`;
+        `params => prenom:${prenom} | plateforme:${plateforme} | marche:${marche} | objectif:${objectif} | style:${style} | longueur:${lengthMode} | persona:${persona} | intention:${intention}`;
 
       $("daysInfo").textContent =
         (typeof days === "number") ? `Dernier contact : il y a ${days} jour(s).` : `Astuce : ajoute une date pour contextualiser.`;
     }
 
     // --------- contacts (local) ---------
+    function migrateContact(raw) {
+      const c = { ...(raw || {}) };
+      if (!c.marche && c.relation) c.marche = c.relation;
+      if (!c.marche) c.marche = "froid";
+      if (!c.relation_type) c.relation_type = "prospect";
+      c.telephone = normalizePhone(c.telephone || "");
+      c.email = normalizeEmail(c.email || "");
+      return c;
+    }
+
     function loadContacts() {
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+      try {
+        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        return Array.isArray(parsed) ? parsed.map(migrateContact) : [];
+      }
       catch { return []; }
     }
     function saveContacts(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
@@ -459,7 +540,10 @@
       return {
         prenom: clean($("prenom").value),
         plateforme: $("plateforme").value,
-        relation: $("relation").value,
+        marche: $("marche").value,
+        relation_type: $("relation_type").value,
+        telephone: normalizePhone($("telephone").value),
+        email: normalizeEmail($("email").value),
         objectif: $("objectif").value,
         style: $("styleTone").value,
         longueur: $("lengthMode").value,
@@ -473,6 +557,15 @@
         accroche: clean($("accroche").value),
         note: clean($("note").value)
       };
+    }
+
+    function updateContactInfoAndCopyButtons(c) {
+      const info = $("contactInfo");
+      const tel = c?.telephone || "";
+      const email = c?.email || "";
+      info.textContent = c ? `Téléphone : ${tel || "—"}\nEmail : ${email || "—"}` : "";
+      $("btnCopyPhone").disabled = !tel;
+      $("btnCopyEmail").disabled = !email;
     }
 
     function computeNextFollowUp(c) {
@@ -489,7 +582,8 @@
 
       $("prenom").value = c.prenom || "";
       $("plateforme").value = c.plateforme || "Instagram";
-      $("relation").value = c.relation || "froid";
+      $("marche").value = c.marche || "froid";
+      $("relation_type").value = c.relation_type || "prospect";
       $("objectif").value = c.objectif || "discussion";
       $("styleTone").value = c.style || "neutre";
       $("lengthMode").value = c.longueur || "normal";
@@ -502,6 +596,9 @@
       $("centre").value = c.centre || "";
       $("accroche").value = c.accroche || "";
       $("note").value = c.note || "";
+      $("telephone").value = c.telephone || "";
+      $("email").value = c.email || "";
+      updateContactInfoAndCopyButtons(c);
       generate();
     }
 
@@ -552,13 +649,17 @@
       }
 
       const relanceCount = contacts.filter((c) => isUrgent(c, today)).length;
-      $("relanceCount").textContent = `Relances du jour : ${relanceCount}`;
+      const totalToFollow = contacts.filter((c) => c.statut === "À relancer").length;
+      $("relanceCount").textContent = `Relances du jour : ${relanceCount} / Total à relancer : ${totalToFollow}`;
 
       const contactsForDisplay = contacts
         .filter((c) => matchesFilter(c, filterValue, today))
         .filter((c) => matchesSearch(c, searchValue))
         .slice()
         .sort((a, b) => {
+          const urgentA = isUrgent(a, today) ? 0 : 1;
+          const urgentB = isUrgent(b, today) ? 0 : 1;
+          if (urgentA !== urgentB) return urgentA - urgentB;
           const da = a.prochaine_relance || "";
           const db = b.prochaine_relance || "";
           if (!da && !db) return 0;
@@ -605,6 +706,10 @@
     function addOrUpdateContact() {
       const c = getFormAsContact();
       if (!c.prenom) { alert("Ajoute au moins un prénom pour enregistrer 🙂"); return; }
+      if (c.email && !isValidEmail(c.email)) {
+        alert("Email invalide : merci de vérifier le format (ex: nom@domaine.com).");
+        return;
+      }
 
       const contacts = loadContacts();
       const key = contactKey(c);
@@ -621,6 +726,7 @@
 
       selectedKey = key;
       refreshUI();
+      updateContactInfoAndCopyButtons(c);
     }
 
     function deleteSelectedContact() {
@@ -639,6 +745,7 @@
 
       if (selectedKey === key) selectedKey = "";
       refreshUI();
+      updateContactInfoAndCopyButtons(null);
     }
 
     function updateSelectedContact(updateFn) {
@@ -668,13 +775,14 @@
       updateSelectedContact((c) => {
         c.statut = "À relancer";
         c.objectif = objectif;
-        if (!c.dernier) c.dernier = todayISO();
-        c.prochaine_relance = addDaysISO(todayISO(), days);
+        const base = c.dernier || todayISO();
+        if (!c.dernier) c.dernier = base;
+        c.prochaine_relance = addDaysISO(base, days);
       });
     }
 
     // --------- CSV ---------
-    const CSV_HEADERS = ["prenom","plateforme","relation","objectif","style","longueur","persona","intention","statut","date_creation","dernier","prochaine_relance","centre","accroche","note"];
+    const CSV_HEADERS = ["prenom","plateforme","marche","relation_type","telephone","email","objectif","style","longueur","persona","intention","statut","date_creation","dernier","prochaine_relance","centre","accroche","note"];
 
     function escapeCSV(value) {
       const s = String(value ?? "");
@@ -753,7 +861,11 @@
           });
 
           if (!obj.plateforme) obj.plateforme = "Instagram";
-          if (!obj.relation) obj.relation = "froid";
+          if (!obj.marche && obj.relation) obj.marche = obj.relation;
+          if (!obj.marche) obj.marche = "froid";
+          if (!obj.relation_type) obj.relation_type = "prospect";
+          obj.telephone = normalizePhone(obj.telephone || "");
+          obj.email = normalizeEmail(obj.email || "");
           if (!obj.objectif) obj.objectif = "discussion";
           if (!obj.style) obj.style = "neutre";
           if (!obj.longueur) obj.longueur = "normal";
@@ -784,10 +896,24 @@
     }
 
     // --------- events ---------
-    $("btnGen").addEventListener("click", generate);
-    $("btnRandom").addEventListener("click", generate);
+    warnDuplicateIds();
 
-    $("btnCopy").addEventListener("click", async () => {
+    function copyWithFeedback(btnId, value, defaultLabel) {
+      if (!value) return;
+      navigator.clipboard.writeText(value)
+        .then(() => {
+          $(btnId).textContent = "Copié ✅";
+          setTimeout(() => { $(btnId).textContent = defaultLabel; }, 900);
+        })
+        .catch(() => {
+          alert("Copie impossible. Copie manuelle requise.");
+        });
+    }
+
+    addListenerOnce("btnGen", "click", generate);
+    addListenerOnce("btnRandom", "click", generate);
+
+    addListenerOnce("btnCopy", "click", async function onCopyMessage() {
       const text = $("result").value;
       if (!text) return;
       try {
@@ -799,11 +925,20 @@
       }
     });
 
-    $("btnClear").addEventListener("click", () => {
-      ["prenom","centre","accroche","note","dernier","prochaine"].forEach(id => $(id).value = "");
+    addListenerOnce("btnCopyPhone", "click", function onCopyPhone() {
+      copyWithFeedback("btnCopyPhone", $("telephone").value, "Copier tel");
+    });
+
+    addListenerOnce("btnCopyEmail", "click", function onCopyEmail() {
+      copyWithFeedback("btnCopyEmail", $("email").value, "Copier email");
+    });
+
+    addListenerOnce("btnClear", "click", function onClear() {
+      ["prenom","centre","accroche","note","dernier","prochaine","telephone","email"].forEach(id => $(id).value = "");
       $("dateCreation").value = "";
       $("plateforme").value = "Instagram";
-      $("relation").value = "froid";
+      $("marche").value = "froid";
+      $("relation_type").value = "prospect";
       $("objectif").value = "discussion";
       $("styleTone").value = "neutre";
       $("lengthMode").value = "normal";
@@ -814,31 +949,38 @@
       $("debug").textContent = "";
       $("daysInfo").textContent = "";
       selectedKey = "";
+      updateContactInfoAndCopyButtons(null);
       generate();
       refreshUI();
     });
 
-    $("btnAdd").addEventListener("click", addOrUpdateContact);
-    $("btnDelete").addEventListener("click", deleteSelectedContact);
-    $("btnMarkReplied").addEventListener("click", markAsReplied);
-    $("btnPlan7").addEventListener("click", () => planFollowUp(7, "relance7"));
-    $("btnPlan14").addEventListener("click", () => planFollowUp(14, "relance14"));
+    addListenerOnce("btnAdd", "click", addOrUpdateContact);
+    addListenerOnce("btnDelete", "click", deleteSelectedContact);
+    addListenerOnce("btnMarkReplied", "click", markAsReplied);
+    addListenerOnce("btnPlan7", "click", function onPlan7() { planFollowUp(7, "relance7"); });
+    addListenerOnce("btnPlan14", "click", function onPlan14() { planFollowUp(14, "relance14"); });
 
-    $("contactSelect").addEventListener("change", () => {
+    addListenerOnce("contactSelect", "change", function onContactSelectChange() {
       const contacts = loadContacts();
       selectedKey = $("contactSelect").value;
-      if (!selectedKey) return;
+      if (!selectedKey) {
+        updateContactInfoAndCopyButtons(null);
+        return;
+      }
       const found = getContactByKey(contacts, selectedKey);
       if (!found) return;
       fillFormFromContact(found);
     });
 
-    $("filterSelect").addEventListener("change", refreshUI);
-    $("searchInput").addEventListener("input", refreshUI);
+    addListenerOnce("telephone", "input", function onPhoneInput() { updateContactInfoAndCopyButtons(getFormAsContact()); });
+    addListenerOnce("email", "input", function onEmailInput() { updateContactInfoAndCopyButtons(getFormAsContact()); });
 
-    $("btnExport").addEventListener("click", exportCSV);
-    $("btnImportBtn").addEventListener("click", () => $("importFile").click());
-    $("importFile").addEventListener("change", (e) => {
+    addListenerOnce("filterSelect", "change", refreshUI);
+    addListenerOnce("searchInput", "input", refreshUI);
+
+    addListenerOnce("btnExport", "click", exportCSV);
+    addListenerOnce("btnImportBtn", "click", function onImportClick() { $("importFile").click(); });
+    addListenerOnce("importFile", "change", function onImportChange(e) {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       importCSVFile(file);
@@ -854,14 +996,15 @@
       const next = (obj === "relance14") ? addDaysISO(base, 14) : addDaysISO(base, 7);
       $("prochaine").value = next;
     }
-    $("statut").addEventListener("change", autoSuggestNext);
-    $("objectif").addEventListener("change", autoSuggestNext);
-    $("dernier").addEventListener("change", autoSuggestNext);
+    addListenerOnce("statut", "change", autoSuggestNext);
+    addListenerOnce("objectif", "change", autoSuggestNext);
+    addListenerOnce("dernier", "change", autoSuggestNext);
 
     // init
     refreshUI();
     generate();
     autoSuggestNext();
+    updateContactInfoAndCopyButtons(null);
   </script>
 </body>
 </html>
