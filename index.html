@@ -31,6 +31,7 @@
     .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .inline > * { flex: 1; min-width: 180px; }
     .badge-urgent { display:inline-block; padding:2px 8px; border-radius:999px; background:#ffe1e1; color:#8b1d1d; border:1px solid #f1bcbc; font-size:11px; font-weight:700; }
+    .contact-info { white-space: pre-line; }
   </style>
 </head>
 <body>
@@ -137,6 +138,17 @@
 
       <div class="row2">
         <div>
+          <label for="telephone">Téléphone</label>
+          <input id="telephone" placeholder="Ex: 06 12 34 56 78" />
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="Ex: julie@email.com" />
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
           <label for="dernier">Dernier contact</label>
           <input id="dernier" type="date" />
           <div class="small">Optionnel : sert au contexte du message.</div>
@@ -199,6 +211,8 @@
         <button class="ghost" id="btnMarkReplied">Marquer comme Répondu</button>
         <button class="ghost" id="btnPlan7">Planifier relance J+7</button>
         <button class="ghost" id="btnPlan14">Planifier relance J+14</button>
+        <button class="ghost" id="btnCopyPhone" disabled>Copier tel</button>
+        <button class="ghost" id="btnCopyEmail" disabled>Copier email</button>
       </div>
 
       <div class="actions">
@@ -255,6 +269,8 @@
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     const clean = (s) => (s || "").trim();
     const STORAGE_KEY = "mlm_contacts_v2";
+    const SCHEMA_VERSION_KEY = "mlm_contacts_schema_version";
+    const SCHEMA_VERSION = "v3";
     let selectedKey = "";
 
     // --------- dates helpers ---------
@@ -433,11 +449,58 @@
     }
 
     // --------- contacts (local) ---------
+    function migrateContact(contact) {
+      const c = { ...(contact || {}) };
+
+      if (!c.marche) c.marche = c.relation || "froid";
+      if (!c.relation) c.relation = c.marche;
+      if (!c.relation_type) c.relation_type = c.relationType || "";
+      if (!c.objectif) c.objectif = c.sujet || c.topic || "discussion";
+
+      c.telephone = normalizePhone(c.telephone || c.tel || c.phone || "");
+      c.email = normalizeEmail(c.email || c.mail || "");
+      c.plateforme = c.plateforme || "Instagram";
+      c.style = c.style || "neutre";
+      c.longueur = c.longueur || "normal";
+      c.persona = c.persona || "indefini";
+      c.intention = c.intention || "reseau";
+      c.statut = c.statut || "Nouveau";
+      c.date_creation = c.date_creation || "";
+      c.dernier = c.dernier || "";
+      c.prochaine_relance = c.prochaine_relance || "";
+      c.centre = c.centre || "";
+      c.accroche = c.accroche || "";
+      c.note = c.note || "";
+
+      return c;
+    }
+
     function loadContacts() {
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
-      catch { return []; }
+      try {
+        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        const list = Array.isArray(parsed) ? parsed.map(migrateContact) : [];
+        if (localStorage.getItem(SCHEMA_VERSION_KEY) !== SCHEMA_VERSION) {
+          saveContacts(list);
+          localStorage.setItem(SCHEMA_VERSION_KEY, SCHEMA_VERSION);
+        }
+        return list;
+      } catch {
+        return [];
+      }
     }
     function saveContacts(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+
+    function normalizePhone(phone) {
+      return clean(String(phone || "").replace(/\s+/g, " "));
+    }
+
+    function normalizeEmail(email) {
+      return clean(email).toLowerCase();
+    }
+
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
 
     function normalizeKeyPart(value) {
       return clean(value)
@@ -460,6 +523,10 @@
         prenom: clean($("prenom").value),
         plateforme: $("plateforme").value,
         relation: $("relation").value,
+        marche: $("relation").value,
+        relation_type: "",
+        telephone: normalizePhone($("telephone").value),
+        email: normalizeEmail($("email").value),
         objectif: $("objectif").value,
         style: $("styleTone").value,
         longueur: $("lengthMode").value,
@@ -490,6 +557,8 @@
       $("prenom").value = c.prenom || "";
       $("plateforme").value = c.plateforme || "Instagram";
       $("relation").value = c.relation || "froid";
+      $("telephone").value = c.telephone || "";
+      $("email").value = c.email || "";
       $("objectif").value = c.objectif || "discussion";
       $("styleTone").value = c.style || "neutre";
       $("lengthMode").value = c.longueur || "normal";
@@ -502,7 +571,35 @@
       $("centre").value = c.centre || "";
       $("accroche").value = c.accroche || "";
       $("note").value = c.note || "";
+      refreshQuickActions();
       generate();
+    }
+
+    function getSelectedContact() {
+      const key = $("contactSelect").value || selectedKey;
+      if (!key) return null;
+      return getContactByKey(loadContacts(), key) || null;
+    }
+
+    function refreshQuickActions() {
+      const c = getSelectedContact();
+      const btnPhone = $("btnCopyPhone");
+      const btnEmail = $("btnCopyEmail");
+      if (btnPhone) btnPhone.disabled = !c || !c.telephone;
+      if (btnEmail) btnEmail.disabled = !c || !c.email;
+    }
+
+    async function copySelectedField(field, buttonId, defaultLabel) {
+      const c = getSelectedContact();
+      const btn = $(buttonId);
+      if (!btn || !c || !c[field]) return;
+      try {
+        await navigator.clipboard.writeText(c[field]);
+        btn.textContent = "Copié ✅";
+        setTimeout(() => { btn.textContent = defaultLabel; }, 900);
+      } catch {
+        alert("Copie impossible. Sélectionne le texte et fais Ctrl+C.");
+      }
     }
 
     function isUrgent(c, today) {
@@ -551,14 +648,17 @@
         sel.value = "";
       }
 
-      const relanceCount = contacts.filter((c) => isUrgent(c, today)).length;
-      $("relanceCount").textContent = `Relances du jour : ${relanceCount}`;
+      const relanceTodayCount = contacts.filter((c) => isUrgent(c, today)).length;
+      const relanceTotalCount = contacts.filter((c) => c.statut === "À relancer").length;
+      $("relanceCount").textContent = `Relances du jour : ${relanceTodayCount} / Total à relancer : ${relanceTotalCount}`;
 
       const contactsForDisplay = contacts
         .filter((c) => matchesFilter(c, filterValue, today))
         .filter((c) => matchesSearch(c, searchValue))
         .slice()
         .sort((a, b) => {
+          const urgentDiff = Number(isUrgent(b, today)) - Number(isUrgent(a, today));
+          if (urgentDiff !== 0) return urgentDiff;
           const da = a.prochaine_relance || "";
           const db = b.prochaine_relance || "";
           if (!da && !db) return 0;
@@ -595,7 +695,12 @@
         const td4 = document.createElement("td");
         td4.textContent = c.prochaine_relance ? `${c.prochaine_relance}${formatFollowUpSuffix(c.prochaine_relance)}` : "";
 
-        const td5 = document.createElement("td"); td5.textContent = c.note || "";
+        const td5 = document.createElement("td");
+        td5.className = "contact-info";
+        const info = [c.note || "", c.telephone ? `📞 ${c.telephone}` : "", c.email ? `✉️ ${c.email}` : ""]
+          .filter(Boolean)
+          .join("\n");
+        td5.textContent = info;
 
         tr.append(td1, td2, td3, td4, td5);
         tbody.appendChild(tr);
@@ -605,6 +710,7 @@
     function addOrUpdateContact() {
       const c = getFormAsContact();
       if (!c.prenom) { alert("Ajoute au moins un prénom pour enregistrer 🙂"); return; }
+      if (c.email && !isValidEmail(c.email)) { alert("Email invalide. Vérifie le format (ex: nom@domaine.com)."); return; }
 
       const contacts = loadContacts();
       const key = contactKey(c);
@@ -615,12 +721,15 @@
 
       $("dateCreation").value = c.date_creation;
       $("prochaine").value = c.prochaine_relance;
+      $("telephone").value = c.telephone;
+      $("email").value = c.email;
 
       if (i >= 0) contacts[i] = c; else contacts.push(c);
       saveContacts(contacts);
 
       selectedKey = key;
       refreshUI();
+      refreshQuickActions();
     }
 
     function deleteSelectedContact() {
@@ -639,6 +748,7 @@
 
       if (selectedKey === key) selectedKey = "";
       refreshUI();
+      refreshQuickActions();
     }
 
     function updateSelectedContact(updateFn) {
@@ -654,6 +764,7 @@
       saveContacts(contacts);
       selectedKey = key;
       refreshUI();
+      refreshQuickActions();
     }
 
     function markAsReplied() {
@@ -668,8 +779,8 @@
       updateSelectedContact((c) => {
         c.statut = "À relancer";
         c.objectif = objectif;
-        if (!c.dernier) c.dernier = todayISO();
-        c.prochaine_relance = addDaysISO(todayISO(), days);
+        const base = c.dernier || todayISO();
+        c.prochaine_relance = addDaysISO(base, days);
       });
     }
 
@@ -752,8 +863,14 @@
             obj[h] = (idx != null && idx < line.length) ? (line[idx] || "") : "";
           });
 
+          if (!obj.relation && map["marche"] != null) obj.relation = line[map["marche"]] || "";
+
           if (!obj.plateforme) obj.plateforme = "Instagram";
           if (!obj.relation) obj.relation = "froid";
+          obj.marche = obj.relation;
+          obj.relation_type = (map["relation_type"] != null && map["relation_type"] < line.length) ? (line[map["relation_type"]] || "") : "";
+          obj.telephone = normalizePhone((map["telephone"] != null && map["telephone"] < line.length) ? (line[map["telephone"]] || "") : "");
+          obj.email = normalizeEmail((map["email"] != null && map["email"] < line.length) ? (line[map["email"]] || "") : "");
           if (!obj.objectif) obj.objectif = "discussion";
           if (!obj.style) obj.style = "neutre";
           if (!obj.longueur) obj.longueur = "normal";
@@ -784,10 +901,21 @@
     }
 
     // --------- events ---------
-    $("btnGen").addEventListener("click", generate);
-    $("btnRandom").addEventListener("click", generate);
+    function addListenerOnce(id, event, handler) {
+      const el = $(id);
+      if (!el || el.dataset.bound === "1") return;
+      el.addEventListener(event, handler);
+      el.dataset.bound = "1";
+    }
 
-    $("btnCopy").addEventListener("click", async () => {
+    if (document.querySelectorAll("#btnMarkReplied").length > 1) {
+      console.warn("ID dupliqué détecté : #btnMarkReplied");
+    }
+
+    addListenerOnce("btnGen", "click", generate);
+    addListenerOnce("btnRandom", "click", generate);
+
+    addListenerOnce("btnCopy", "click", async () => {
       const text = $("result").value;
       if (!text) return;
       try {
@@ -799,8 +927,8 @@
       }
     });
 
-    $("btnClear").addEventListener("click", () => {
-      ["prenom","centre","accroche","note","dernier","prochaine"].forEach(id => $(id).value = "");
+    addListenerOnce("btnClear", "click", () => {
+      ["prenom","centre","accroche","note","dernier","prochaine","telephone","email"].forEach(id => $(id).value = "");
       $("dateCreation").value = "";
       $("plateforme").value = "Instagram";
       $("relation").value = "froid";
@@ -816,29 +944,32 @@
       selectedKey = "";
       generate();
       refreshUI();
+      refreshQuickActions();
     });
 
-    $("btnAdd").addEventListener("click", addOrUpdateContact);
-    $("btnDelete").addEventListener("click", deleteSelectedContact);
-    $("btnMarkReplied").addEventListener("click", markAsReplied);
-    $("btnPlan7").addEventListener("click", () => planFollowUp(7, "relance7"));
-    $("btnPlan14").addEventListener("click", () => planFollowUp(14, "relance14"));
+    addListenerOnce("btnAdd", "click", addOrUpdateContact);
+    addListenerOnce("btnDelete", "click", deleteSelectedContact);
+    addListenerOnce("btnMarkReplied", "click", markAsReplied);
+    addListenerOnce("btnPlan7", "click", () => planFollowUp(7, "relance7"));
+    addListenerOnce("btnPlan14", "click", () => planFollowUp(14, "relance14"));
+    addListenerOnce("btnCopyPhone", "click", () => copySelectedField("telephone", "btnCopyPhone", "Copier tel"));
+    addListenerOnce("btnCopyEmail", "click", () => copySelectedField("email", "btnCopyEmail", "Copier email"));
 
-    $("contactSelect").addEventListener("change", () => {
+    addListenerOnce("contactSelect", "change", () => {
       const contacts = loadContacts();
       selectedKey = $("contactSelect").value;
-      if (!selectedKey) return;
+      if (!selectedKey) { refreshQuickActions(); return; }
       const found = getContactByKey(contacts, selectedKey);
       if (!found) return;
       fillFormFromContact(found);
     });
 
-    $("filterSelect").addEventListener("change", refreshUI);
-    $("searchInput").addEventListener("input", refreshUI);
+    addListenerOnce("filterSelect", "change", refreshUI);
+    addListenerOnce("searchInput", "input", refreshUI);
 
-    $("btnExport").addEventListener("click", exportCSV);
-    $("btnImportBtn").addEventListener("click", () => $("importFile").click());
-    $("importFile").addEventListener("change", (e) => {
+    addListenerOnce("btnExport", "click", exportCSV);
+    addListenerOnce("btnImportBtn", "click", () => $("importFile").click());
+    addListenerOnce("importFile", "change", (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       importCSVFile(file);
@@ -854,14 +985,24 @@
       const next = (obj === "relance14") ? addDaysISO(base, 14) : addDaysISO(base, 7);
       $("prochaine").value = next;
     }
-    $("statut").addEventListener("change", autoSuggestNext);
-    $("objectif").addEventListener("change", autoSuggestNext);
-    $("dernier").addEventListener("change", autoSuggestNext);
+    addListenerOnce("statut", "change", autoSuggestNext);
+    addListenerOnce("objectif", "change", autoSuggestNext);
+    addListenerOnce("dernier", "change", autoSuggestNext);
 
     // init
     refreshUI();
     generate();
     autoSuggestNext();
+    refreshQuickActions();
   </script>
+
+  <!--
+    Tests manuels
+    - Planification relance : Planifier J+7/J+14 part de "dernier" si présent, sinon de la date du jour.
+    - Affichage tel/email : le tableau affiche note + téléphone + email sur plusieurs lignes (CSS pre-line).
+    - IDs / listeners : vérifier qu'il n'existe qu'un #btnMarkReplied et qu'un clic déclenche une seule action.
+    - Import ancien CSV : colonne "relation" est importée et utilisée comme fallback de "marche".
+    - Migration localStorage : champ legacy "relationType" est migré vers "relation_type".
+  -->
 </body>
 </html>
