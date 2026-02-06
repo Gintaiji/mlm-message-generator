@@ -31,7 +31,7 @@
     .inline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .inline > * { flex: 1; min-width: 180px; }
     .badge-urgent { display:inline-block; padding:2px 8px; border-radius:999px; background:#ffe1e1; color:#8b1d1d; border:1px solid #f1bcbc; font-size:11px; font-weight:700; }
-    .contact-info { font-size:12px; color:#555; line-height:1.3; }
+    .contact-info { font-size:12px; color:#555; line-height:1.3; white-space: pre-line; }
   </style>
 </head>
 <body>
@@ -224,6 +224,8 @@
         <button class="ghost" id="btnMarkReplied">Marquer comme Répondu</button>
         <button class="ghost" id="btnPlan7">Planifier relance J+7</button>
         <button class="ghost" id="btnPlan14">Planifier relance J+14</button>
+        <button class="ghost" id="btnCopyPhone" disabled>Copier tel</button>
+        <button class="ghost" id="btnCopyEmail" disabled>Copier email</button>
       </div>
 
       <div class="actions">
@@ -284,6 +286,8 @@
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     const clean = (s) => (s || "").trim();
     const STORAGE_KEY = "mlm_contacts_v2";
+    const SCHEMA_VERSION_KEY = "mlm_contacts_schema_version";
+    const SCHEMA_VERSION = 3;
     let selectedKey = "";
 
     // --------- dates helpers ---------
@@ -327,6 +331,18 @@
       const ms = now - d;
       if (isNaN(ms)) return null;
       return Math.floor(ms / (1000 * 60 * 60 * 24));
+    }
+
+    function normalizePhone(value) {
+      return clean(value).replace(/\s+/g, " ");
+    }
+
+    function normalizeEmail(value) {
+      return clean(value).toLowerCase();
+    }
+
+    function isValidEmail(value) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     }
 
     function formatFollowUpSuffix(dateISO) {
@@ -465,6 +481,9 @@
     function migrateContact(contact) {
       const migrated = { ...contact };
       if (!migrated.marche && migrated.relation) migrated.marche = migrated.relation;
+      if (!migrated.relation_type && migrated.relationType) migrated.relation_type = migrated.relationType;
+      if (!migrated.objectif && migrated.sujet) migrated.objectif = migrated.sujet;
+      if (!migrated.objectif && migrated.subject) migrated.objectif = migrated.subject;
       if (!migrated.relation_type) migrated.relation_type = "prospect";
       if (!migrated.telephone) migrated.telephone = "";
       if (!migrated.email) migrated.email = "";
@@ -474,21 +493,29 @@
     function loadContacts() {
       try {
         const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        const schemaVersion = Number(localStorage.getItem(SCHEMA_VERSION_KEY) || "0");
         let changed = false;
-        const migrated = raw.map((c) => {
-          const next = migrateContact(c);
-          if (next.marche !== c.marche || next.relation_type !== c.relation_type || next.telephone !== c.telephone || next.email !== c.email) {
-            changed = true;
-          }
-          return next;
-        });
-        if (changed) saveContacts(migrated);
-        return migrated;
+        let contacts = raw;
+        if (schemaVersion < SCHEMA_VERSION) {
+          contacts = raw.map((c) => {
+            const next = migrateContact(c);
+            if (next.marche !== c.marche || next.relation_type !== c.relation_type || next.telephone !== c.telephone || next.email !== c.email || next.objectif !== c.objectif) {
+              changed = true;
+            }
+            return next;
+          });
+          localStorage.setItem(SCHEMA_VERSION_KEY, String(SCHEMA_VERSION));
+        }
+        if (changed) saveContacts(contacts);
+        return contacts;
       } catch {
         return [];
       }
     }
-    function saveContacts(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+    function saveContacts(list) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      localStorage.setItem(SCHEMA_VERSION_KEY, String(SCHEMA_VERSION));
+    }
 
     function normalizeKeyPart(value) {
       return clean(value)
@@ -512,8 +539,8 @@
         plateforme: $("plateforme").value,
         marche: $("marche").value,
         relation_type: $("relationType").value,
-        telephone: clean($("telephone").value),
-        email: clean($("email").value),
+        telephone: normalizePhone($("telephone").value),
+        email: normalizeEmail($("email").value),
         objectif: $("objectif").value,
         style: $("styleTone").value,
         longueur: $("lengthMode").value,
@@ -559,6 +586,7 @@
       $("centre").value = c.centre || "";
       $("accroche").value = c.accroche || "";
       $("note").value = c.note || "";
+      updateCopyButtonsState(c);
       generate();
     }
 
@@ -604,21 +632,28 @@
           sel.appendChild(o);
         });
 
-      if (selectedKey && getContactByKey(contacts, selectedKey)) {
+      const selectedContact = selectedKey ? getContactByKey(contacts, selectedKey) : null;
+      if (selectedKey && selectedContact) {
         sel.value = selectedKey;
+        updateCopyButtonsState(selectedContact);
       } else {
         selectedKey = "";
         sel.value = "";
+        updateCopyButtonsState(null);
       }
 
       const relanceCount = contacts.filter((c) => isUrgent(c, today)).length;
-      $("relanceCount").textContent = `Relances du jour : ${relanceCount}`;
+      const totalRelance = contacts.filter((c) => c.statut === "À relancer").length;
+      $("relanceCount").textContent = `Relances du jour : ${relanceCount} / Total à relancer : ${totalRelance}`;
 
       const contactsForDisplay = contacts
         .filter((c) => matchesFilter(c, filterValue, today))
         .filter((c) => matchesSearch(c, searchValue))
         .slice()
         .sort((a, b) => {
+          const urgentA = isUrgent(a, today);
+          const urgentB = isUrgent(b, today);
+          if (urgentA !== urgentB) return urgentA ? -1 : 1;
           const da = a.prochaine_relance || "";
           const db = b.prochaine_relance || "";
           if (!da && !db) return 0;
@@ -672,6 +707,15 @@
     }
 
     function addOrUpdateContact() {
+      const phoneNormalized = normalizePhone($("telephone").value);
+      const emailNormalized = normalizeEmail($("email").value);
+      if (emailNormalized && !isValidEmail(emailNormalized)) {
+        alert("Email invalide. Merci de corriger le format (ex: nom@domaine.com).");
+        return;
+      }
+      $("telephone").value = phoneNormalized;
+      $("email").value = emailNormalized;
+
       const c = getFormAsContact();
       if (!c.prenom) { alert("Ajoute au moins un prénom pour enregistrer 🙂"); return; }
 
@@ -738,8 +782,28 @@
         c.statut = "À relancer";
         c.objectif = objectif;
         if (!c.dernier) c.dernier = todayISO();
-        c.prochaine_relance = addDaysISO(todayISO(), days);
+        const base = c.dernier || todayISO();
+        c.prochaine_relance = addDaysISO(base, days);
       });
+    }
+
+    function updateCopyButtonsState(contact) {
+      const phoneBtn = $("btnCopyPhone");
+      const emailBtn = $("btnCopyEmail");
+      if (phoneBtn) phoneBtn.disabled = !contact || !clean(contact.telephone);
+      if (emailBtn) emailBtn.disabled = !contact || !clean(contact.email);
+    }
+
+    async function copyValue(buttonId, value, fallbackLabel) {
+      const btn = $(buttonId);
+      if (!btn || !value) return;
+      try {
+        await navigator.clipboard.writeText(value);
+        btn.textContent = "Copié ✅";
+        setTimeout(() => btn.textContent = fallbackLabel, 900);
+      } catch {
+        alert("Copie impossible. Sélectionne le texte et fais Ctrl+C.");
+      }
     }
 
     // --------- CSV ---------
@@ -861,11 +925,20 @@
     }
 
     // --------- events ---------
-    $("btnGen").addEventListener("click", generate);
-    $("btnRandom").addEventListener("click", generate);
+    function addListenerOnce(id, event, handler) {
+      const el = $(id);
+      if (!el) return;
+      const key = `bound${event}`;
+      if (el.dataset[key]) return;
+      el.addEventListener(event, handler);
+      el.dataset[key] = "1";
+    }
 
-    $("btnCopy").addEventListener("click", async () => {
-      const text = $("result").value;
+    addListenerOnce("btnGen", "click", generate);
+    addListenerOnce("btnRandom", "click", generate);
+
+    addListenerOnce("btnCopy", "click", async () => {
+      const text = $("result")?.value;
       if (!text) return;
       try {
         await navigator.clipboard.writeText(text);
@@ -876,7 +949,21 @@
       }
     });
 
-    $("btnClear").addEventListener("click", () => {
+    addListenerOnce("btnCopyPhone", "click", () => {
+      const contact = selectedKey ? getContactByKey(loadContacts(), selectedKey) : null;
+      const phone = contact ? clean(contact.telephone) : "";
+      if (!phone) return;
+      copyValue("btnCopyPhone", phone, "Copier tel");
+    });
+
+    addListenerOnce("btnCopyEmail", "click", () => {
+      const contact = selectedKey ? getContactByKey(loadContacts(), selectedKey) : null;
+      const email = contact ? clean(contact.email) : "";
+      if (!email) return;
+      copyValue("btnCopyEmail", email, "Copier email");
+    });
+
+    addListenerOnce("btnClear", "click", () => {
       ["prenom","centre","accroche","note","dernier","prochaine","telephone","email"].forEach(id => $(id).value = "");
       $("dateCreation").value = "";
       $("plateforme").value = "Instagram";
@@ -892,31 +979,38 @@
       $("debug").textContent = "";
       $("daysInfo").textContent = "";
       selectedKey = "";
+      updateCopyButtonsState(null);
       generate();
       refreshUI();
     });
 
-    $("btnAdd").addEventListener("click", addOrUpdateContact);
-    $("btnDelete").addEventListener("click", deleteSelectedContact);
-    $("btnMarkReplied").addEventListener("click", markAsReplied);
-    $("btnPlan7").addEventListener("click", () => planFollowUp(7, "relance7"));
-    $("btnPlan14").addEventListener("click", () => planFollowUp(14, "relance14"));
+    addListenerOnce("btnAdd", "click", addOrUpdateContact);
+    addListenerOnce("btnDelete", "click", deleteSelectedContact);
+    addListenerOnce("btnMarkReplied", "click", markAsReplied);
+    addListenerOnce("btnPlan7", "click", () => planFollowUp(7, "relance7"));
+    addListenerOnce("btnPlan14", "click", () => planFollowUp(14, "relance14"));
 
-    $("contactSelect").addEventListener("change", () => {
+    addListenerOnce("contactSelect", "change", () => {
       const contacts = loadContacts();
       selectedKey = $("contactSelect").value;
-      if (!selectedKey) return;
+      if (!selectedKey) {
+        updateCopyButtonsState(null);
+        return;
+      }
       const found = getContactByKey(contacts, selectedKey);
-      if (!found) return;
+      if (!found) {
+        updateCopyButtonsState(null);
+        return;
+      }
       fillFormFromContact(found);
     });
 
-    $("filterSelect").addEventListener("change", refreshUI);
-    $("searchInput").addEventListener("input", refreshUI);
+    addListenerOnce("filterSelect", "change", refreshUI);
+    addListenerOnce("searchInput", "input", refreshUI);
 
-    $("btnExport").addEventListener("click", exportCSV);
-    $("btnImportBtn").addEventListener("click", () => $("importFile").click());
-    $("importFile").addEventListener("change", (e) => {
+    addListenerOnce("btnExport", "click", exportCSV);
+    addListenerOnce("btnImportBtn", "click", () => $("importFile").click());
+    addListenerOnce("importFile", "change", (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       importCSVFile(file);
@@ -932,9 +1026,9 @@
       const next = (obj === "relance14") ? addDaysISO(base, 14) : addDaysISO(base, 7);
       $("prochaine").value = next;
     }
-    $("statut").addEventListener("change", autoSuggestNext);
-    $("objectif").addEventListener("change", autoSuggestNext);
-    $("dernier").addEventListener("change", autoSuggestNext);
+    addListenerOnce("statut", "change", autoSuggestNext);
+    addListenerOnce("objectif", "change", autoSuggestNext);
+    addListenerOnce("dernier", "change", autoSuggestNext);
 
     // init
     refreshUI();
@@ -944,10 +1038,11 @@
 
   <!--
     Tests manuels :
-    1) Ancien localStorage existant → tout s’affiche et “Relation” est migrée vers “Marché”.
-    2) Import ancien CSV → mapping relation → marche OK.
-    3) Export puis re-import nouveau CSV → données identiques.
-    4) Création d’un contact avec tel/email → sauvegarde OK.
+    1) Planifier relance J+7/J+14 → base = dernier si disponible, sinon aujourd’hui.
+    2) Tableau → téléphone/email s’affichent sur 2 lignes.
+    3) Pas d’IDs/boutons dupliqués → listeners uniques.
+    4) Import ancien CSV → mapping relation → marche OK.
+    5) Migration relationType → relation_type OK.
   -->
 </body>
 </html>
