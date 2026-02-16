@@ -21,6 +21,27 @@ Aucune installation, aucun serveur requis.
 
 ---
 
+
+## Nouveau : générateur de message naturel (3 variantes)
+Le générateur produit désormais automatiquement :
+- **Version courte**
+- **Version moyenne**
+- **Version fun**
+
+Entrées utilisées : `prénom` (optionnel), `plateforme`, `accroche/contexte`, `sujet`.
+
+Règles intégrées :
+- français naturel et ton humain,
+- pas de vocabulaire MLM explicite,
+- pas de promesses de gains,
+- maximum **1 emoji** par variante,
+- chaque variante finit par une question simple (`Tu préfères ... ?`).
+
+Cas limites gérés :
+- prénom vide → `Salut !`
+- plateforme inconnue → fallback générique (`ta plateforme`)
+- contexte vide → message safe + question de clarification
+
 ## Technologies
 - HTML
 - CSS

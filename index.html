@@ -281,6 +281,7 @@
     </div>
   </div>
 
+  <script src="./message-generator.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -455,23 +456,37 @@
     }
 
     function generate() {
-      const prenom = clean($("prenom").value) || "toi";
+      const prenom = clean($("prenom").value);
       const plateforme = $("plateforme").value;
-      const marche = $("marche").value;
       const objectif = $("objectif").value;
-      const style = $("styleTone").value;
-      const lengthMode = $("lengthMode").value;
-      const persona = $("persona").value;
-      const intention = $("intention").value;
-      const accroche = clean($("accroche").value);
-      const centre = clean($("centre").value);
+      const contexte = clean($("accroche").value);
       const days = daysSince($("dernier").value);
 
-      const msg = buildMessage({ prenom, plateforme, marche, objectif, style, lengthMode, persona, intention, accroche, centre, days });
-      $("result").value = msg;
+      const variants = NaturalMessageGenerator.generateNaturalMessageVariants({
+        prenom,
+        plateforme,
+        contexte,
+        objectif
+      });
+
+      $("result").value = [
+        "[Version courte]",
+        variants.short,
+        "",
+        "[Version moyenne]",
+        variants.medium,
+        "",
+        "[Version fun]",
+        variants.fun
+      ].join("\n");
 
       $("debug").textContent =
-        `params => prenom:${prenom} | plateforme:${plateforme} | marche:${marche} | sujet:${objectif} | style:${style} | longueur:${lengthMode} | persona:${persona} | intention:${intention}`;
+        `params => prenom:${prenom || "(vide)"} | plateforme:${plateforme} | sujet:${objectif} | contexte:${contexte || "(vide)"} | fallbackPlateforme:${variants.meta.platformFallbackUsed ? "oui" : "non"}`;
+
+      if (variants.meta.contextMissing) {
+        $("daysInfo").textContent = "Contexte manquant : génération en mode safe + question de clarification.";
+        return;
+      }
 
       $("daysInfo").textContent =
         (typeof days === "number") ? `Dernier contact : il y a ${days} jour(s).` : `Astuce : ajoute une date pour contextualiser.`;
