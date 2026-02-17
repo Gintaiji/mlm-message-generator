@@ -124,34 +124,30 @@
 
   function buildVariant(kind, data) {
     const { greeting, detailLine, platformLine, goalLine, safeLine, question } = data;
+    const contextOrSafe = detailLine || safeLine;
 
     if (kind === "short") {
-      return joinSentences([greeting, detailLine || safeLine, goalLine, question]);
+      return joinSentences([greeting, contextOrSafe || goalLine, question]);
     }
 
     if (kind === "medium") {
-      return joinSentences([greeting, platformLine, detailLine || safeLine, goalLine, question]);
+      const core = contextOrSafe || platformLine;
+      return joinSentences([greeting, core, question]);
     }
 
-    return joinSentences([
-      greeting,
-      platformLine,
-      detailLine || safeLine,
-      "Message simple, sans pression 🙂",
-      goalLine,
-      question
-    ]);
+    const funLine = contextOrSafe || "Petit message rapide 🙂";
+    return joinSentences([greeting, funLine, question]);
   }
 
   function buildSoberVariant(kind, data) {
-    const { greeting, goalLine, question, safeLine } = data;
+    const { greeting, question, safeLine } = data;
     if (kind === "short") {
-      return joinSentences([greeting, safeLine, goalLine, question]);
+      return joinSentences([greeting, safeLine || "Je te laisse un mot rapide.", question]);
     }
     if (kind === "medium") {
-      return joinSentences([greeting, "Message clair et simple.", safeLine, goalLine, question]);
+      return joinSentences([greeting, safeLine || "Je viens en direct.", question]);
     }
-    return joinSentences([greeting, "Je reste simple.", safeLine, goalLine, question]);
+    return joinSentences([greeting, safeLine || "Je reste court.", question]);
   }
 
   function applySpamGuard(variantMap, data) {

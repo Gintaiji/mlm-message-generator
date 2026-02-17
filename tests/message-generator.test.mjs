@@ -73,3 +73,18 @@ test('conformité: aucune variante ne contient de mots interdits', () => {
     assert.doesNotMatch(text, FORBIDDEN);
   }
 });
+
+
+test('aucune variante ne contient les phrases interdites', () => {
+  const variants = messageGenerator({
+    firstName: 'Julie',
+    platform: 'Instagram',
+    context: 'ton commentaire',
+    goal: 'discussion'
+  });
+
+  for (const text of allVariants(variants)) {
+    assert.doesNotMatch(text, /échange simple et humain/i);
+    assert.doesNotMatch(text, /partant pour un échange/i);
+  }
+});
