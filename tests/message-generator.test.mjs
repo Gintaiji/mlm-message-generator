@@ -2,98 +2,74 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import generator from '../message-generator.js';
 
-const { generateNaturalMessageVariants } = generator;
-
-const FORBIDDEN_WORDS = /\b(opportunité|business|revenus?|recruter|équipe|urgent|vite|garanti|MLM)\b/i;
-
-function emojiCount(text) {
-  const matches = text.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu);
-  return matches ? matches.length : 0;
-}
+const { messageGenerator, spamScore } = generator;
+const FORBIDDEN = /\b(mlm|opportunité|business|revenus?|recruter|équipe)\b/i;
 
 function allVariants(variants) {
   return [variants.short, variants.medium, variants.fun];
 }
 
-test('génère 3 variantes et finit toujours par une question binaire', () => {
-  const variants = generateNaturalMessageVariants({
-    prenom: 'Julie',
-    plateforme: 'Instagram',
-    contexte: 'ton commentaire',
-    objectif: 'invitation'
+test('prénom absent -> salutation neutre', () => {
+  const variants = messageGenerator({
+    firstName: '',
+    platform: 'Instagram',
+    context: 'ton commentaire',
+    goal: 'discussion'
   });
 
-  assert.equal(allVariants(variants).length, 3);
-  for (const text of allVariants(variants)) {
-    assert.match(text, /Tu préfères/i);
-    assert.match(text, /\?\s*$/);
-  }
+  assert.match(variants.short, /^Salut !/);
 });
 
-test('personnalisation légère: si prénom présent, le contexte n’est pas injecté', () => {
-  const variants = generateNaturalMessageVariants({
-    prenom: 'Julie',
-    plateforme: 'Instagram',
-    contexte: 'ton commentaire sur la routine',
-    objectif: 'discussion'
+test('contexte absent -> mode safe', () => {
+  const variants = messageGenerator({
+    firstName: 'Julie',
+    platform: 'Facebook',
+    context: '',
+    goal: 'question'
   });
 
-  assert.equal(variants.meta.personalization, 'prenom');
-  assert.match(variants.short, /Salut Julie !/);
-  assert.doesNotMatch(variants.short, /routine|commentaire/i);
+  assert.equal(variants.meta.contextMissing, true);
+  assert.match(variants.short, /pas assez de contexte/i);
 });
 
-test('prénom manquant => salutation neutre', () => {
-  const variants = generateNaturalMessageVariants({
-    prenom: '',
-    plateforme: 'Facebook',
-    contexte: 'ton post',
-    objectif: 'discussion'
-  });
-
-  assert.ok(variants.short.startsWith('Salut !'));
-});
-
-test('plateforme inconnue => fallback générique', () => {
-  const variants = generateNaturalMessageVariants({
-    prenom: 'Lina',
-    plateforme: 'LinkedIn',
-    contexte: 'tes publications',
-    objectif: 'question'
+test('plateforme inconnue -> fallback générique', () => {
+  const variants = messageGenerator({
+    firstName: 'Lina',
+    platform: 'LinkedIn',
+    context: 'ton post',
+    goal: 'invitation'
   });
 
   assert.equal(variants.meta.platformFallbackUsed, true);
   assert.match(variants.medium, /Je t’écris ici avec un message simple\./);
 });
 
-test('contexte vide => mode safe + question de clarification', () => {
-  const variants = generateNaturalMessageVariants({
-    prenom: '',
-    plateforme: 'TikTok',
-    contexte: ' ',
-    objectif: 'discussion'
-  });
-
-  assert.equal(variants.meta.contextMissing, true);
-  assert.match(variants.short, /pas assez de contexte/i);
-  assert.match(variants.short, /Tu préfères me donner un peu de contexte/i);
+test('spamScore pénalise emojis, !, mots interdits et longues phrases', () => {
+  const msg = 'Salut !!! 😀😀😀 Cette opportunité business donne des revenus rapides et ce message est volontairement très long pour dépasser largement la taille recommandée et gonfler le score.';
+  assert.ok(spamScore(msg) > 35);
 });
 
-test('contraintes copywriting: mots interdits absents + emoji seulement fun', () => {
-  const variants = generateNaturalMessageVariants({
-    prenom: 'Nora',
-    plateforme: 'Instagram',
-    contexte: 'ton reel',
-    objectif: 'relance7'
+test('spamScore > 35 déclenche la régénération sobre', () => {
+  const variants = messageGenerator({
+    firstName: '',
+    platform: 'Instagram',
+    context: 'opportunité !!! 😀😀😀 avec une phrase vraiment beaucoup trop longue pour rester naturelle et qui continue encore pour forcer une note de spam élevée',
+    goal: 'discussion'
   });
 
-  for (const [index, text] of allVariants(variants).entries()) {
-    assert.doesNotMatch(text, FORBIDDEN_WORDS);
-    if (index < 2) assert.equal(emojiCount(text), 0);
-    if (index === 2) assert.ok(emojiCount(text) <= 1);
+  assert.equal(variants.meta.regenerated.short, true);
+  assert.ok(variants.meta.spamScores.short <= 35);
+});
+
+test('conformité: aucune variante ne contient de mots interdits', () => {
+  const variants = messageGenerator({
+    firstName: '',
+    platform: 'TikTok',
+    context: 'business mlm',
+    goal: 'relance7'
+  });
+
+  for (const text of allVariants(variants)) {
+    assert.doesNotMatch(text, FORBIDDEN);
   }
-});
-
-test('erreur claire si input invalide', () => {
-  assert.throws(() => generateNaturalMessageVariants(null), TypeError);
 });

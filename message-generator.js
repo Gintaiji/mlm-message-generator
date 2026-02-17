@@ -5,6 +5,16 @@
     tiktok: "TikTok"
   };
 
+  const FORBIDDEN_WORDS = [
+    "mlm",
+    "opportunité",
+    "business",
+    "revenu",
+    "revenus",
+    "recruter",
+    "équipe"
+  ];
+
   const BINARY_QUESTIONS = {
     knownPlatform: (platform) => `Tu préfères qu’on continue ici sur ${platform} ou demain ?`,
     generic: "Tu préfères qu’on continue ici ou demain ?",
@@ -20,7 +30,16 @@
     return KNOWN_PLATFORMS[normalized] || null;
   }
 
-  function objectiveLine(objective) {
+  function normalizeInput(input) {
+    return {
+      firstName: clean(input.firstName || input.prenom),
+      platform: clean(input.platform || input.plateforme),
+      context: clean(input.context || input.contexte),
+      goal: clean(input.goal || input.objectif)
+    };
+  }
+
+  function objectiveLine(goal) {
     const map = {
       discussion: "Je voulais juste ouvrir la conversation simplement.",
       question: "J’ai une question simple pour toi.",
@@ -28,26 +47,32 @@
       relance7: "Je me permets un petit retour, sans pression.",
       relance14: "Je te laisse un dernier mot, sans pression."
     };
-    return map[clean(objective)] || map.discussion;
+    return map[goal] || map.discussion;
+  }
+
+  function removeForbiddenWords(text) {
+    let output = text;
+    FORBIDDEN_WORDS.forEach((word) => {
+      const pattern = new RegExp(`\\b${word}\\b`, "gi");
+      output = output.replace(pattern, "").replace(/\s{2,}/g, " ").trim();
+    });
+    return output;
   }
 
   function buildPersonalization(firstName, context) {
-    const name = clean(firstName);
-    const contextValue = clean(context);
-
-    if (name) {
+    if (firstName) {
       return {
-        greeting: `Salut ${name} !`,
+        greeting: `Salut ${firstName} !`,
         detailLine: "",
         usedName: true,
         usedContext: false
       };
     }
 
-    if (contextValue) {
+    if (context) {
       return {
         greeting: "Salut !",
-        detailLine: `On s’est croisés via ${contextValue}.`,
+        detailLine: `On s’est croisés via ${removeForbiddenWords(context)}.`,
         usedName: false,
         usedContext: true
       };
@@ -71,6 +96,32 @@
     return parts.filter(Boolean).join(" ");
   }
 
+  function spamScore(message) {
+    const text = clean(message);
+    if (!text) return 0;
+
+    let score = 0;
+
+    const emojiMatches = text.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu) || [];
+    if (emojiMatches.length > 1) score += (emojiMatches.length - 1) * 12;
+
+    const exclamations = (text.match(/!/g) || []).length;
+    if (exclamations > 1) score += (exclamations - 1) * 8;
+
+    const lower = text.toLowerCase();
+    FORBIDDEN_WORDS.forEach((word) => {
+      if (lower.includes(word)) score += 30;
+    });
+
+    const sentences = text.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean);
+    sentences.forEach((sentence) => {
+      const words = sentence.split(/\s+/).filter(Boolean).length;
+      if (words > 18) score += Math.min((words - 18) * 1.5, 20);
+    });
+
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
   function buildVariant(kind, data) {
     const { greeting, detailLine, platformLine, goalLine, safeLine, question } = data;
 
@@ -92,15 +143,50 @@
     ]);
   }
 
-  function generateNaturalMessageVariants(input) {
+  function buildSoberVariant(kind, data) {
+    const { greeting, goalLine, question, safeLine } = data;
+    if (kind === "short") {
+      return joinSentences([greeting, safeLine, goalLine, question]);
+    }
+    if (kind === "medium") {
+      return joinSentences([greeting, "Message clair et simple.", safeLine, goalLine, question]);
+    }
+    return joinSentences([greeting, "Je reste simple.", safeLine, goalLine, question]);
+  }
+
+  function applySpamGuard(variantMap, data) {
+    const result = {};
+    const scores = {};
+    const regenerated = {};
+
+    ["short", "medium", "fun"].forEach((kind) => {
+      const sanitized = removeForbiddenWords(variantMap[kind]);
+      const score = spamScore(sanitized);
+      if (score > 35) {
+        const sober = removeForbiddenWords(buildSoberVariant(kind, data));
+        result[kind] = sober;
+        scores[kind] = spamScore(sober);
+        regenerated[kind] = true;
+      } else {
+        result[kind] = sanitized;
+        scores[kind] = score;
+        regenerated[kind] = false;
+      }
+    });
+
+    return { result, scores, regenerated };
+  }
+
+  function messageGenerator(input) {
     if (!input || typeof input !== "object") {
       throw new TypeError("input must be an object");
     }
 
-    const platformLabel = normalizePlatformName(input.plateforme);
-    const personalization = buildPersonalization(input.prenom, input.contexte);
-    const goalLine = objectiveLine(input.objectif);
-    const contextMissing = !personalization.usedContext && !clean(input.contexte);
+    const normalized = normalizeInput(input);
+    const platformLabel = normalizePlatformName(normalized.platform);
+    const personalization = buildPersonalization(normalized.firstName, normalized.context);
+    const goalLine = objectiveLine(normalized.goal);
+    const contextMissing = !personalization.usedContext && !normalized.context;
 
     const data = {
       greeting: personalization.greeting,
@@ -115,21 +201,33 @@
       question: closingQuestion(platformLabel, contextMissing)
     };
 
-    return {
+    const initialVariants = {
       short: buildVariant("short", data),
       medium: buildVariant("medium", data),
-      fun: buildVariant("fun", data),
+      fun: buildVariant("fun", data)
+    };
+
+    const guard = applySpamGuard(initialVariants, data);
+
+    return {
+      short: guard.result.short,
+      medium: guard.result.medium,
+      fun: guard.result.fun,
       meta: {
         platformFallbackUsed: !platformLabel,
         contextMissing,
-        personalization: personalization.usedName ? "prenom" : personalization.usedContext ? "contexte" : "none"
+        personalization: personalization.usedName ? "firstName" : personalization.usedContext ? "context" : "none",
+        spamScores: guard.scores,
+        regenerated: guard.regenerated
       }
     };
   }
 
   global.NaturalMessageGenerator = {
-    generateNaturalMessageVariants,
-    normalizePlatformName
+    messageGenerator,
+    generateNaturalMessageVariants: messageGenerator,
+    normalizePlatformName,
+    spamScore
   };
 
   if (typeof module !== "undefined" && module.exports) {
