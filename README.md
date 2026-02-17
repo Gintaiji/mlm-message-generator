@@ -35,7 +35,9 @@ Règles intégrées :
 - pas de vocabulaire MLM explicite,
 - pas de promesses de gains,
 - maximum **1 emoji** par variante,
-- chaque variante finit par une question simple (`Tu préfères ... ?`).
+- chaque variante finit par une question binaire simple (`Tu préfères ... ?`).
+- personnalisation légère : 1 seul détail (prénom **ou** contexte).
+- zéro pression et mots sensibles exclus (`opportunité`, `business`, `revenus`, `recruter`, `équipe`).
 
 Cas limites gérés :
 - prénom vide → `Salut !`

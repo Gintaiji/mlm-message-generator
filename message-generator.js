@@ -5,6 +5,12 @@
     tiktok: "TikTok"
   };
 
+  const BINARY_QUESTIONS = {
+    knownPlatform: (platform) => `Tu préfères qu’on continue ici sur ${platform} ou demain ?`,
+    generic: "Tu préfères qu’on continue ici ou demain ?",
+    missingContext: "Tu préfères me donner un peu de contexte, ou que je reste sur un message très simple ?"
+  };
+
   function clean(value) {
     return String(value || "").trim();
   }
@@ -14,80 +20,76 @@
     return KNOWN_PLATFORMS[normalized] || null;
   }
 
-  function safeGreeting(firstName) {
-    const name = clean(firstName);
-    return name ? `Salut ${name} !` : "Salut !";
-  }
-
   function objectiveLine(objective) {
     const map = {
-      discussion: "J’avais envie d’ouvrir la discussion simplement.",
-      question: "J’ai une petite question rapide à te poser.",
-      invitation: "Si tu es ok, on peut se caler un court échange.",
-      relance7: "Je te fais une relance légère, au cas où mon message soit passé à côté.",
-      relance14: "Je reviens une dernière fois, sans pression."
+      discussion: "Je voulais juste ouvrir la conversation simplement.",
+      question: "J’ai une question simple pour toi.",
+      invitation: "Si tu veux, on peut échanger tranquillement.",
+      relance7: "Je me permets un petit retour, sans pression.",
+      relance14: "Je te laisse un dernier mot, sans pression."
     };
     return map[clean(objective)] || map.discussion;
   }
 
-  function contextLine(context) {
-    const cleaned = clean(context);
-    if (!cleaned) {
+  function buildPersonalization(firstName, context) {
+    const name = clean(firstName);
+    const contextValue = clean(context);
+
+    if (name) {
       return {
-        missing: true,
-        value: "Je n’ai pas encore beaucoup de contexte, donc je préfère un message simple et respectueux."
+        greeting: `Salut ${name} !`,
+        detailLine: "",
+        usedName: true,
+        usedContext: false
+      };
+    }
+
+    if (contextValue) {
+      return {
+        greeting: "Salut !",
+        detailLine: `On s’est croisés via ${contextValue}.`,
+        usedName: false,
+        usedContext: true
       };
     }
 
     return {
-      missing: false,
-      value: `On s’est croisés via ${cleaned}, et ça m’a donné envie de t’écrire.`
+      greeting: "Salut !",
+      detailLine: "",
+      usedName: false,
+      usedContext: false
     };
   }
 
-  function closingQuestion(platformLabel, isContextMissing) {
-    if (isContextMissing) {
-      return "Tu préfères me dire en une phrase ton contexte du moment, ou que je t’envoie une version encore plus courte ?";
-    }
-
-    if (platformLabel) {
-      return `Tu préfères qu’on continue ici sur ${platformLabel} ou en vocal rapide ?`;
-    }
-
-    return "Tu préfères qu’on continue ici ou en vocal rapide ?";
+  function closingQuestion(platformLabel, contextMissing) {
+    if (contextMissing) return BINARY_QUESTIONS.missingContext;
+    if (platformLabel) return BINARY_QUESTIONS.knownPlatform(platformLabel);
+    return BINARY_QUESTIONS.generic;
   }
 
-  function buildVariant(parts, kind) {
-    const { greeting, platformLabel, context, objective, question } = parts;
-    const genericPlatform = platformLabel || "ta plateforme";
+  function joinSentences(parts) {
+    return parts.filter(Boolean).join(" ");
+  }
 
-    if (kind === "court") {
-      return [
-        greeting,
-        `${context}`,
-        `${objective}`,
-        `${question}`
-      ].join(" ");
+  function buildVariant(kind, data) {
+    const { greeting, detailLine, platformLine, goalLine, safeLine, question } = data;
+
+    if (kind === "short") {
+      return joinSentences([greeting, detailLine || safeLine, goalLine, question]);
     }
 
-    if (kind === "moyen") {
-      return [
-        greeting,
-        `Je t’écris depuis ${genericPlatform} avec un message naturel, sans copier-coller.`,
-        context,
-        objective,
-        question
-      ].join(" ");
+    if (kind === "medium") {
+      return joinSentences([greeting, platformLine, detailLine || safeLine, goalLine, question]);
     }
 
-    return [
+    return joinSentences([
       greeting,
-      `Petit message spontané 🙂 depuis ${genericPlatform}.`,
-      context,
-      "Promis, je fais simple et humain.",
-      objective,
+      platformLine,
+      detailLine || safeLine,
+      "Message simple, sans pression 🙂",
+      goalLine,
       question
-    ].join(" ");
+    ]);
   }
 
   function generateNaturalMessageVariants(input) {
@@ -96,26 +98,31 @@
     }
 
     const platformLabel = normalizePlatformName(input.plateforme);
-    const context = contextLine(input.contexte);
-    const objective = objectiveLine(input.objectif);
-    const greeting = safeGreeting(input.prenom);
-    const question = closingQuestion(platformLabel, context.missing);
+    const personalization = buildPersonalization(input.prenom, input.contexte);
+    const goalLine = objectiveLine(input.objectif);
+    const contextMissing = !personalization.usedContext && !clean(input.contexte);
 
-    const parts = {
-      greeting,
-      platformLabel,
-      context: context.value,
-      objective,
-      question
+    const data = {
+      greeting: personalization.greeting,
+      detailLine: personalization.detailLine,
+      platformLine: platformLabel
+        ? `Je t’écris via ${platformLabel}.`
+        : "Je t’écris ici avec un message simple.",
+      goalLine,
+      safeLine: contextMissing
+        ? "Je n’ai pas assez de contexte, donc je reste direct et respectueux."
+        : "",
+      question: closingQuestion(platformLabel, contextMissing)
     };
 
     return {
-      short: buildVariant(parts, "court"),
-      medium: buildVariant(parts, "moyen"),
-      fun: buildVariant(parts, "fun"),
+      short: buildVariant("short", data),
+      medium: buildVariant("medium", data),
+      fun: buildVariant("fun", data),
       meta: {
         platformFallbackUsed: !platformLabel,
-        contextMissing: context.missing
+        contextMissing,
+        personalization: personalization.usedName ? "prenom" : personalization.usedContext ? "contexte" : "none"
       }
     };
   }
