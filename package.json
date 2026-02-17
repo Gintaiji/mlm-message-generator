@@ -1,0 +1,10 @@
+{
+  "name": "mlm-message-generator",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "lint": "node --check message-generator.js",
+    "build": "node --check message-generator.js && node --check tests/message-generator.test.mjs"
+  }
+}
